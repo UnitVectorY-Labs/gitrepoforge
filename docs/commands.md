@@ -19,7 +19,7 @@ gitrepoforge validate [flags]
 
 ### Behavior
 
-1. Loads the root config (`.gitrepoforge-config`) and central config (`gitrepoforge.yaml`).
+1. Loads the root config (`.gitrepoforge-config`) and central config (`inputs/` + `outputs/` directories).
 2. Discovers Git repos in the workspace (or targets the single `--repo`).
 3. For each repo:
    - If no `.gitrepoforge` file exists, the repo is **skipped**.

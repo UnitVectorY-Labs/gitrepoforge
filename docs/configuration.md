@@ -20,85 +20,150 @@ create_pr: true                    # Optional. Create a pull request after push.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `config_repo` | string | yes | — | Path to the repo containing `gitrepoforge.yaml` and templates. |
+| `config_repo` | string | yes | — | Path to the repo containing `inputs/` and `outputs/` directories. |
 | `default_branch` | string | yes | — | The default branch name used when checking out repos. |
 | `excludes` | list of strings | no | `[]` | Glob patterns matched against repo directory names. |
 | `branch_prefix` | string | no | `"gitrepoforge/"` | Prefix prepended to branch names created by apply/bootstrap. |
 | `create_pr` | bool | no | `false` | Whether to open a PR via `gh pr create` after pushing. |
 
-## Central Config — `gitrepoforge.yaml`
+## Central Config — `inputs/` and `outputs/` Directories
 
-Located in the config repo (the repo referenced by `config_repo`). Defines the input schema and file rules that apply to all managed repos.
+Located in the config repo (the repo referenced by `config_repo`). Instead of a single YAML file, the central config uses a directory-based layout: one file per input definition and one file per output rule.
 
-```yaml
-inputs:
-  - name: language
-    type: string
-    required: true
-    enum: ["go", "python", "node"]
-    description: "Primary language of the repo."
-  - name: enable_ci
-    type: boolean
-    default: "true"
-    description: "Whether to generate CI config."
-  - name: team
-    type: string
-    required: false
-    description: "Owning team name."
-
-files:
-  - path: .github/workflows/ci.yml
-    condition: "enable_ci"
-    template: templates/ci.yml.tmpl
-  - path: CODEOWNERS
-    content: "* @{{getInput .Inputs \"team\"}}"
-  - path: .eslintrc.json
-    condition: "language == node"
-    template: templates/eslintrc.json.tmpl
-  - path: legacy.txt
-    action: delete
-  - path: README.md
-    action: partial
-    blocks:
-      - begin_marker: "<!-- BEGIN MANAGED -->"
-        end_marker: "<!-- END MANAGED -->"
-        template: templates/readme-block.tmpl
+```
+config-repo/
+├── inputs/
+│   ├── language.yaml
+│   ├── enable_ci.yaml
+│   └── team.yaml
+└── outputs/
+    ├── .github/
+    │   └── workflows/
+    │       └── ci.yml.gitrepoforge
+    ├── CODEOWNERS.gitrepoforge
+    ├── .eslintrc.json.gitrepoforge
+    ├── legacy.txt.gitrepoforge
+    └── README.md.gitrepoforge
 ```
 
-### Input Definitions (`inputs`)
+### Input Definitions — `inputs/`
+
+Each input is defined in its own YAML file under `inputs/`. The filename (without `.yaml`) becomes the input name.
+
+**`inputs/language.yaml`**
+```yaml
+type: string
+required: true
+enum: ["go", "python", "node"]
+description: "Primary language of the repo."
+```
+
+**`inputs/enable_ci.yaml`**
+```yaml
+type: boolean
+default: "true"
+description: "Whether to generate CI config."
+```
+
+**`inputs/team.yaml`**
+```yaml
+type: string
+required: false
+description: "Owning team name."
+```
+
+#### Input Fields
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `name` | string | yes | Identifier used in conditions and templates. |
 | `type` | string | yes | One of `string`, `boolean`, `number`, `list`. |
 | `required` | bool | no | If `true`, every repo must provide this input. |
 | `enum` | list of strings | no | Allowed values (only for `string` type). |
 | `default` | string | no | Default value when the input is omitted. |
 | `description` | string | no | Human-readable description. |
 
-### File Rules (`files`)
+The input name is derived from the filename (e.g., `inputs/language.yaml` → input name `language`).
+
+### Output Rules — `outputs/`
+
+Each output rule is defined in its own YAML file under `outputs/`. The file path mirrors the target path in the managed repo, with a `.gitrepoforge` suffix. For example, the rule for `.github/workflows/ci.yml` lives at `outputs/.github/workflows/ci.yml.gitrepoforge`.
+
+**`outputs/.github/workflows/ci.yml.gitrepoforge`**
+```yaml
+mode: create
+condition: "enable_ci"
+template: |
+  name: CI
+  on: [push]
+  jobs:
+    build:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - name: Build
+          run: make build
+```
+
+**`outputs/CODEOWNERS.gitrepoforge`**
+```yaml
+template: "* @{{getInput .Inputs \"team\"}}"
+```
+
+**`outputs/.eslintrc.json.gitrepoforge`**
+```yaml
+condition: "language == \"node\""
+template: |
+  {
+    "extends": "eslint:recommended"
+  }
+```
+
+**`outputs/legacy.txt.gitrepoforge`**
+```yaml
+mode: delete
+```
+
+**`outputs/README.md.gitrepoforge`**
+```yaml
+mode: partial
+blocks:
+  - begin_marker: "<!-- BEGIN MANAGED -->"
+    end_marker: "<!-- END MANAGED -->"
+    template: |
+      This section is managed by gitrepoforge.
+      Language: {{.Inputs.language}}
+```
+
+#### Output Fields
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `path` | string | yes | Target file path relative to the repo root. |
-| `action` | string | no | `create` (default), `delete`, or `partial`. |
+| `mode` | string | no | `create` (default), `delete`, or `partial`. |
 | `condition` | string | no | Condition that must be true for this rule to apply. See [templates.md](templates.md#conditions). |
-| `template` | string | no | Path to a template file in the config repo. |
-| `content` | string | no | Inline template string. Use `template` or `content`, not both. |
-| `blocks` | list | no | Block rules for `partial` action only. |
+| `template` | string | no | Inline Go template string for the file content. Used with `create` mode. |
+| `blocks` | list | no | Block rules for `partial` mode only. |
+
+The target file path is derived from the output file's path by removing the `outputs/` prefix and the `.gitrepoforge` suffix.
+
+#### Modes
+
+| Mode | Description |
+|------|-------------|
+| `create` | The entire file is managed by gitrepoforge. If missing it is created; if different it is updated. This is the default. |
+| `delete` | The file should not exist. If present it is removed. |
+| `partial` | Only managed blocks within the file are controlled; the rest is user-maintained. |
 
 ### Block Rules (`blocks`)
 
-Used with `action: partial` to manage sections within an existing file.
+Used with `mode: partial` to manage sections within an existing file.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `begin_marker` | string | yes | Start marker for the managed block. |
 | `end_marker` | string | yes | End marker for the managed block. |
-| `template` | string | no | Path to a template file for block content. |
-| `content` | string | no | Inline template string for block content. |
+| `template` | string | no | Inline Go template string for block content. |
 
-If the markers are not found in the target file, the block (including markers and content) is appended to the end of the file.
+If the markers are not found in the target file, the block (markers + rendered content) is appended to the end of the file.
 
 ## Per-Repo Config — `.gitrepoforge`
 

@@ -12,8 +12,18 @@ When managing many repositories, it is common to need consistent configuration f
 workspace/
 ├── .gitrepoforge-config        # Root config — points to the config repo
 ├── config-repo/
-│   ├── gitrepoforge.yaml       # Central config — inputs + file rules
-│   └── templates/              # Template files referenced by file rules
+│   ├── inputs/                  # Input definitions — one YAML file per input
+│   │   ├── language.yaml
+│   │   ├── enable_ci.yaml
+│   │   └── team.yaml
+│   └── outputs/                 # Output rules — path mirrors target, .gitrepoforge suffix
+│       ├── .github/
+│       │   └── workflows/
+│       │       └── ci.yml.gitrepoforge
+│       ├── CODEOWNERS.gitrepoforge
+│       ├── .eslintrc.json.gitrepoforge
+│       ├── legacy.txt.gitrepoforge
+│       └── README.md.gitrepoforge
 ├── repo-a/
 │   └── .gitrepoforge           # Per-repo config — name + input values
 ├── repo-b/
@@ -27,13 +37,13 @@ workspace/
 |-----------|-------------|
 | **Discovery** | Scans the workspace for Git repositories, applying exclude patterns from the root config. |
 | **Schema** | Validates each repo's `.gitrepoforge` file against the input definitions in the central config. |
-| **Engine** | Renders templates and computes findings (create, update, delete, block_replace) for each repo. |
+| **Engine** | Renders inline templates and computes findings (create, update, delete, block_replace) for each repo. |
 | **GitOps** | Creates branches, commits changes, pushes, and optionally opens pull requests via `gh`. |
 | **Output** | Formats results as human-readable text or JSON. |
 
 ### Workflow
 
-1. **Load** the root config (`.gitrepoforge-config`) and central config (`gitrepoforge.yaml`).
+1. **Load** the root config (`.gitrepoforge-config`) and central config (`inputs/` + `outputs/` directories).
 2. **Discover** Git repos in the workspace, excluding patterns from the root config.
 3. For each repo that has a `.gitrepoforge` file:
    - **Validate** inputs against the central schema.
