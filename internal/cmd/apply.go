@@ -126,7 +126,7 @@ func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg
 		}
 	}
 
-	findings, err := engine.ComputeFindings(repoCfg, centralCfg, configRepoPath, repoPath)
+	findings, err := engine.ComputeFindings(repoCfg, centralCfg, repoPath)
 	if err != nil {
 		return output.RepoResult{
 			Name:             repoName,

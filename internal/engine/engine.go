@@ -28,7 +28,7 @@ type TemplateData struct {
 
 // ComputeFindings computes the compliance findings for a repo.
 // It returns the list of findings (differences between desired and actual state).
-func ComputeFindings(repoCfg *config.RepoConfig, centralCfg *config.CentralConfig, configRepoPath string, repoPath string) ([]Finding, error) {
+func ComputeFindings(repoCfg *config.RepoConfig, centralCfg *config.CentralConfig, repoPath string) ([]Finding, error) {
 	var findings []Finding
 
 	data := TemplateData{
@@ -41,7 +41,7 @@ func ComputeFindings(repoCfg *config.RepoConfig, centralCfg *config.CentralConfi
 			continue
 		}
 
-		ruleFinding, err := evaluateFileRule(rule, data, configRepoPath, repoPath)
+		ruleFinding, err := evaluateFileRule(rule, data, repoPath)
 		if err != nil {
 			return nil, fmt.Errorf("error evaluating rule for %s: %w", rule.Path, err)
 		}
@@ -77,21 +77,25 @@ func ApplyFindings(findings []Finding, repoPath string) error {
 	return nil
 }
 
-func evaluateFileRule(rule config.FileRule, data TemplateData, configRepoPath string, repoPath string) ([]Finding, error) {
-	switch rule.Action {
+func evaluateFileRule(rule config.FileRule, data TemplateData, repoPath string) ([]Finding, error) {
+	switch rule.Mode {
 	case "create":
-		return evaluateCreateRule(rule, data, configRepoPath, repoPath)
+		return evaluateCreateRule(rule, data, repoPath)
 	case "delete":
 		return evaluateDeleteRule(rule, repoPath)
 	case "partial":
-		return evaluatePartialRule(rule, data, configRepoPath, repoPath)
+		return evaluatePartialRule(rule, data, repoPath)
 	default:
-		return evaluateCreateRule(rule, data, configRepoPath, repoPath)
+		return evaluateCreateRule(rule, data, repoPath)
 	}
 }
 
-func evaluateCreateRule(rule config.FileRule, data TemplateData, configRepoPath string, repoPath string) ([]Finding, error) {
-	expected, err := renderContent(rule, data, configRepoPath)
+func evaluateCreateRule(rule config.FileRule, data TemplateData, repoPath string) ([]Finding, error) {
+	if rule.Template == "" {
+		return nil, fmt.Errorf("output rule for %s has no template", rule.Path)
+	}
+
+	expected, err := renderTemplateString(rule.Template, data)
 	if err != nil {
 		return nil, err
 	}
@@ -135,13 +139,13 @@ func evaluateDeleteRule(rule config.FileRule, repoPath string) ([]Finding, error
 	return nil, nil
 }
 
-func evaluatePartialRule(rule config.FileRule, data TemplateData, configRepoPath string, repoPath string) ([]Finding, error) {
+func evaluatePartialRule(rule config.FileRule, data TemplateData, repoPath string) ([]Finding, error) {
 	filePath := filepath.Join(repoPath, rule.Path)
 	actual, err := os.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// For partial rules, if the file doesn't exist, we create it with just the managed blocks
-			content, err := renderManagedBlocks(rule.Blocks, data, configRepoPath)
+			content, err := renderManagedBlocks(rule.Blocks, data)
 			if err != nil {
 				return nil, err
 			}
@@ -159,7 +163,7 @@ func evaluatePartialRule(rule config.FileRule, data TemplateData, configRepoPath
 	expectedContent := currentContent
 
 	for _, block := range rule.Blocks {
-		blockContent, err := renderBlockContent(block, data, configRepoPath)
+		blockContent, err := renderBlockContent(block, data)
 		if err != nil {
 			return nil, err
 		}
@@ -177,24 +181,6 @@ func evaluatePartialRule(rule config.FileRule, data TemplateData, configRepoPath
 	}
 
 	return nil, nil
-}
-
-func renderContent(rule config.FileRule, data TemplateData, configRepoPath string) (string, error) {
-	if rule.Template != "" {
-		return renderTemplateFile(filepath.Join(configRepoPath, rule.Template), data)
-	}
-	if rule.Content != "" {
-		return renderTemplateString(rule.Content, data)
-	}
-	return "", fmt.Errorf("file rule for %s has neither template nor content", rule.Path)
-}
-
-func renderTemplateFile(templatePath string, data TemplateData) (string, error) {
-	tmplData, err := os.ReadFile(templatePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read template %s: %w", templatePath, err)
-	}
-	return renderTemplateString(string(tmplData), data)
 }
 
 func renderTemplateString(tmplStr string, data TemplateData) (string, error) {
@@ -233,10 +219,10 @@ func renderTemplateString(tmplStr string, data TemplateData) (string, error) {
 	return buf.String(), nil
 }
 
-func renderManagedBlocks(blocks []config.BlockRule, data TemplateData, configRepoPath string) (string, error) {
+func renderManagedBlocks(blocks []config.BlockRule, data TemplateData) (string, error) {
 	var parts []string
 	for _, block := range blocks {
-		content, err := renderBlockContent(block, data, configRepoPath)
+		content, err := renderBlockContent(block, data)
 		if err != nil {
 			return "", err
 		}
@@ -245,12 +231,9 @@ func renderManagedBlocks(blocks []config.BlockRule, data TemplateData, configRep
 	return strings.Join(parts, "\n"), nil
 }
 
-func renderBlockContent(block config.BlockRule, data TemplateData, configRepoPath string) (string, error) {
+func renderBlockContent(block config.BlockRule, data TemplateData) (string, error) {
 	if block.Template != "" {
-		return renderTemplateFile(filepath.Join(configRepoPath, block.Template), data)
-	}
-	if block.Content != "" {
-		return renderTemplateString(block.Content, data)
+		return renderTemplateString(block.Template, data)
 	}
 	return "", nil
 }

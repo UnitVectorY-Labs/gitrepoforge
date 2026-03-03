@@ -96,7 +96,7 @@ func runValidate(version string, args []string) {
 			continue
 		}
 
-		findings, err := engine.ComputeFindings(repoCfg, centralCfg, configRepoPath, repoPath)
+		findings, err := engine.ComputeFindings(repoCfg, centralCfg, repoPath)
 		if err != nil {
 			report.Repos = append(report.Repos, output.RepoResult{
 				Name:             repoName,

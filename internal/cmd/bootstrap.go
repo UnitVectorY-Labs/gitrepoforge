@@ -113,7 +113,7 @@ func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centra
 		}
 	}
 
-	findings, err := engine.ComputeFindings(repoCfg, centralCfg, configRepoPath, repoPath)
+	findings, err := engine.ComputeFindings(repoCfg, centralCfg, repoPath)
 	if err != nil {
 		return output.RepoResult{
 			Name:             repoName,

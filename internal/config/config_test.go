@@ -14,6 +14,17 @@ func writeFile(t *testing.T, dir, name, content string) {
 	}
 }
 
+func mkdirAndWrite(t *testing.T, dir, relPath, content string) {
+	t.Helper()
+	full := filepath.Join(dir, relPath)
+	if err := os.MkdirAll(filepath.Dir(full), 0755); err != nil {
+		t.Fatalf("failed to create dirs for %s: %v", relPath, err)
+	}
+	if err := os.WriteFile(full, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write %s: %v", relPath, err)
+	}
+}
+
 func TestLoadRootConfig(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -158,101 +169,90 @@ func TestResolveConfigRepoPath(t *testing.T) {
 func TestLoadCentralConfig(t *testing.T) {
 	tests := []struct {
 		name        string
-		yaml        string
+		setup       func(t *testing.T, dir string)
 		wantErr     bool
 		errContains string
 		check       func(t *testing.T, cfg *CentralConfig)
 	}{
 		{
-			name: "valid config with inputs and files",
-			yaml: `inputs:
-  - name: language
-    type: string
-    required: true
-    enum:
-      - go
-      - python
-    default: go
-    description: "Primary language"
-  - name: enable_ci
-    type: boolean
-    required: false
-files:
-  - path: .github/workflows/ci.yml
-    action: create
-    condition: "inputs.enable_ci"
-    template: ci.yml.tmpl
-  - path: README.md
-    action: patch
-    blocks:
-      - begin_marker: "<!-- BEGIN MANAGED -->"
-        end_marker: "<!-- END MANAGED -->"
-        template: readme_block.tmpl
-        content: "static content"
-`,
+			name: "valid config with inputs and outputs",
+			setup: func(t *testing.T, dir string) {
+				mkdirAndWrite(t, dir, "inputs/language.yaml", `type: string
+required: true
+enum:
+  - go
+  - python
+default: go
+description: "Primary language"
+`)
+				mkdirAndWrite(t, dir, "inputs/enable_ci.yaml", `type: boolean
+required: false
+`)
+				mkdirAndWrite(t, dir, "outputs/README.md.gitrepoforge", `mode: create
+template: "# {{.Name}}\n"
+`)
+				mkdirAndWrite(t, dir, "outputs/.github/workflows/ci.yml.gitrepoforge", `mode: create
+condition: "enable_ci"
+template: "name: CI\n"
+`)
+			},
 			check: func(t *testing.T, cfg *CentralConfig) {
 				if len(cfg.Inputs) != 2 {
 					t.Fatalf("Inputs length = %d, want 2", len(cfg.Inputs))
 				}
-				in0 := cfg.Inputs[0]
-				if in0.Name != "language" || in0.Type != "string" || !in0.Required {
-					t.Errorf("Inputs[0] = %+v", in0)
+				// Sorted by name: enable_ci, language
+				if cfg.Inputs[0].Name != "enable_ci" {
+					t.Errorf("Inputs[0].Name = %q, want %q", cfg.Inputs[0].Name, "enable_ci")
 				}
-				if len(in0.Enum) != 2 || in0.Enum[0] != "go" || in0.Enum[1] != "python" {
-					t.Errorf("Inputs[0].Enum = %v", in0.Enum)
+				if cfg.Inputs[1].Name != "language" {
+					t.Errorf("Inputs[1].Name = %q, want %q", cfg.Inputs[1].Name, "language")
 				}
-				if in0.Default != "go" {
-					t.Errorf("Inputs[0].Default = %q, want %q", in0.Default, "go")
+				lang := cfg.Inputs[1]
+				if lang.Type != "string" || !lang.Required {
+					t.Errorf("language input = %+v", lang)
 				}
-				if in0.Description != "Primary language" {
-					t.Errorf("Inputs[0].Description = %q", in0.Description)
+				if len(lang.Enum) != 2 || lang.Enum[0] != "go" || lang.Enum[1] != "python" {
+					t.Errorf("language.Enum = %v", lang.Enum)
+				}
+				if lang.Default != "go" || lang.Description != "Primary language" {
+					t.Errorf("language defaults/desc = %q / %q", lang.Default, lang.Description)
 				}
 
 				if len(cfg.Files) != 2 {
 					t.Fatalf("Files length = %d, want 2", len(cfg.Files))
 				}
-				f0 := cfg.Files[0]
-				if f0.Path != ".github/workflows/ci.yml" || f0.Action != "create" {
-					t.Errorf("Files[0] = %+v", f0)
+				// Sorted by path: .github/workflows/ci.yml, README.md
+				if cfg.Files[0].Path != ".github/workflows/ci.yml" {
+					t.Errorf("Files[0].Path = %q", cfg.Files[0].Path)
 				}
-				if f0.Condition != "inputs.enable_ci" {
-					t.Errorf("Files[0].Condition = %q", f0.Condition)
+				if cfg.Files[0].Condition != "enable_ci" {
+					t.Errorf("Files[0].Condition = %q", cfg.Files[0].Condition)
 				}
-				if f0.Template != "ci.yml.tmpl" {
-					t.Errorf("Files[0].Template = %q", f0.Template)
-				}
-
-				f1 := cfg.Files[1]
-				if len(f1.Blocks) != 1 {
-					t.Fatalf("Files[1].Blocks length = %d, want 1", len(f1.Blocks))
-				}
-				b := f1.Blocks[0]
-				if b.BeginMarker != "<!-- BEGIN MANAGED -->" || b.EndMarker != "<!-- END MANAGED -->" {
-					t.Errorf("Block markers = %q / %q", b.BeginMarker, b.EndMarker)
-				}
-				if b.Template != "readme_block.tmpl" || b.Content != "static content" {
-					t.Errorf("Block template=%q content=%q", b.Template, b.Content)
+				if cfg.Files[1].Path != "README.md" {
+					t.Errorf("Files[1].Path = %q", cfg.Files[1].Path)
 				}
 			},
 		},
 		{
-			name: "empty config",
-			yaml: ``,
+			name: "empty config repo - no inputs or outputs dirs",
+			setup: func(t *testing.T, dir string) {
+				// nothing
+			},
 			check: func(t *testing.T, cfg *CentralConfig) {
-				if cfg.Inputs != nil {
-					t.Errorf("Inputs = %v, want nil", cfg.Inputs)
+				if len(cfg.Inputs) != 0 {
+					t.Errorf("Inputs length = %d, want 0", len(cfg.Inputs))
 				}
-				if cfg.Files != nil {
-					t.Errorf("Files = %v, want nil", cfg.Files)
+				if len(cfg.Files) != 0 {
+					t.Errorf("Files length = %d, want 0", len(cfg.Files))
 				}
 			},
 		},
 		{
 			name: "inputs only",
-			yaml: `inputs:
-  - name: team
-    type: string
-`,
+			setup: func(t *testing.T, dir string) {
+				mkdirAndWrite(t, dir, "inputs/team.yaml", `type: string
+`)
+			},
 			check: func(t *testing.T, cfg *CentralConfig) {
 				if len(cfg.Inputs) != 1 {
 					t.Fatalf("Inputs length = %d, want 1", len(cfg.Inputs))
@@ -260,32 +260,139 @@ files:
 				if cfg.Inputs[0].Name != "team" {
 					t.Errorf("Inputs[0].Name = %q", cfg.Inputs[0].Name)
 				}
-				if cfg.Files != nil {
-					t.Errorf("Files = %v, want nil", cfg.Files)
+				if len(cfg.Files) != 0 {
+					t.Errorf("Files = %v, want empty", cfg.Files)
 				}
 			},
 		},
 		{
-			name:        "missing file",
-			yaml:        "",
-			wantErr:     true,
-			errContains: "failed to read central config",
+			name: "outputs only",
+			setup: func(t *testing.T, dir string) {
+				mkdirAndWrite(t, dir, "outputs/LICENSE.gitrepoforge", `mode: create
+template: "MIT License\n"
+`)
+			},
+			check: func(t *testing.T, cfg *CentralConfig) {
+				if len(cfg.Inputs) != 0 {
+					t.Errorf("Inputs = %v, want empty", cfg.Inputs)
+				}
+				if len(cfg.Files) != 1 {
+					t.Fatalf("Files length = %d, want 1", len(cfg.Files))
+				}
+				if cfg.Files[0].Path != "LICENSE" {
+					t.Errorf("Files[0].Path = %q, want %q", cfg.Files[0].Path, "LICENSE")
+				}
+			},
 		},
 		{
-			name:        "invalid YAML",
-			yaml:        ":\n  :\n  - :\n\t- bad",
+			name: "default mode is create",
+			setup: func(t *testing.T, dir string) {
+				mkdirAndWrite(t, dir, "outputs/file.txt.gitrepoforge", `template: "content"
+`)
+			},
+			check: func(t *testing.T, cfg *CentralConfig) {
+				if len(cfg.Files) != 1 {
+					t.Fatalf("Files length = %d, want 1", len(cfg.Files))
+				}
+				if cfg.Files[0].Mode != "create" {
+					t.Errorf("Files[0].Mode = %q, want %q", cfg.Files[0].Mode, "create")
+				}
+			},
+		},
+		{
+			name: "partial mode with blocks",
+			setup: func(t *testing.T, dir string) {
+				mkdirAndWrite(t, dir, "outputs/README.md.gitrepoforge", `mode: partial
+blocks:
+  - begin_marker: "<!-- BEGIN MANAGED -->"
+    end_marker: "<!-- END MANAGED -->"
+    template: "managed content"
+`)
+			},
+			check: func(t *testing.T, cfg *CentralConfig) {
+				if len(cfg.Files) != 1 {
+					t.Fatalf("Files length = %d, want 1", len(cfg.Files))
+				}
+				f := cfg.Files[0]
+				if f.Mode != "partial" {
+					t.Errorf("Mode = %q, want %q", f.Mode, "partial")
+				}
+				if len(f.Blocks) != 1 {
+					t.Fatalf("Blocks length = %d, want 1", len(f.Blocks))
+				}
+				if f.Blocks[0].BeginMarker != "<!-- BEGIN MANAGED -->" {
+					t.Errorf("BeginMarker = %q", f.Blocks[0].BeginMarker)
+				}
+			},
+		},
+		{
+			name: "invalid input YAML",
+			setup: func(t *testing.T, dir string) {
+				mkdirAndWrite(t, dir, "inputs/bad.yaml", ":\n  :\n  - :\n\t- bad")
+			},
 			wantErr:     true,
-			errContains: "failed to parse central config",
+			errContains: "failed to parse input file",
+		},
+		{
+			name: "invalid output YAML",
+			setup: func(t *testing.T, dir string) {
+				mkdirAndWrite(t, dir, "outputs/bad.txt.gitrepoforge", ":\n  :\n  - :\n\t- bad")
+			},
+			wantErr:     true,
+			errContains: "failed to parse output file",
+		},
+		{
+			name: "non-yaml files in inputs are ignored",
+			setup: func(t *testing.T, dir string) {
+				mkdirAndWrite(t, dir, "inputs/README.md", "this is not an input")
+				mkdirAndWrite(t, dir, "inputs/language.yaml", `type: string
+`)
+			},
+			check: func(t *testing.T, cfg *CentralConfig) {
+				if len(cfg.Inputs) != 1 {
+					t.Fatalf("Inputs length = %d, want 1", len(cfg.Inputs))
+				}
+				if cfg.Inputs[0].Name != "language" {
+					t.Errorf("Inputs[0].Name = %q", cfg.Inputs[0].Name)
+				}
+			},
+		},
+		{
+			name: "non-gitrepoforge files in outputs are ignored",
+			setup: func(t *testing.T, dir string) {
+				mkdirAndWrite(t, dir, "outputs/README.md", "this is not an output rule")
+				mkdirAndWrite(t, dir, "outputs/LICENSE.gitrepoforge", `template: "MIT"
+`)
+			},
+			check: func(t *testing.T, cfg *CentralConfig) {
+				if len(cfg.Files) != 1 {
+					t.Fatalf("Files length = %d, want 1", len(cfg.Files))
+				}
+			},
+		},
+		{
+			name: "deeply nested output path",
+			setup: func(t *testing.T, dir string) {
+				mkdirAndWrite(t, dir, "outputs/src/main/java/App.java.gitrepoforge", `mode: create
+template: "public class App {}"
+`)
+			},
+			check: func(t *testing.T, cfg *CentralConfig) {
+				if len(cfg.Files) != 1 {
+					t.Fatalf("Files length = %d, want 1", len(cfg.Files))
+				}
+				if cfg.Files[0].Path != "src/main/java/App.java" {
+					t.Errorf("Path = %q, want %q", cfg.Files[0].Path, "src/main/java/App.java")
+				}
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
-			if tt.yaml != "" || (tt.name != "missing file") {
-				if tt.yaml != "" || tt.name == "empty config" {
-					writeFile(t, dir, CentralConfigFileName, tt.yaml)
-				}
+			if tt.setup != nil {
+				tt.setup(t, dir)
 			}
 
 			cfg, err := LoadCentralConfig(dir)

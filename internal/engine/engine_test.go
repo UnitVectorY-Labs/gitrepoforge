@@ -14,7 +14,6 @@ func TestComputeFindings(t *testing.T) {
 		centralCfg     *config.CentralConfig
 		repoCfg        *config.RepoConfig
 		setupRepo      func(t *testing.T, repoPath string)
-		setupConfig    func(t *testing.T, configRepoPath string)
 		wantFindings   int
 		wantOperation  string
 		wantMessage    string
@@ -26,7 +25,7 @@ func TestComputeFindings(t *testing.T) {
 			name: "create rule - file does not exist",
 			centralCfg: &config.CentralConfig{
 				Files: []config.FileRule{
-					{Path: "README.md", Action: "create", Content: "hello world"},
+					{Path: "README.md", Mode: "create", Template: "hello world"},
 				},
 			},
 			repoCfg:       &config.RepoConfig{Name: "test-repo"},
@@ -40,7 +39,7 @@ func TestComputeFindings(t *testing.T) {
 			name: "create rule - file exists but content differs",
 			centralCfg: &config.CentralConfig{
 				Files: []config.FileRule{
-					{Path: "README.md", Action: "create", Content: "expected content"},
+					{Path: "README.md", Mode: "create", Template: "expected content"},
 				},
 			},
 			repoCfg: &config.RepoConfig{Name: "test-repo"},
@@ -57,7 +56,7 @@ func TestComputeFindings(t *testing.T) {
 			name: "create rule - file matches expected",
 			centralCfg: &config.CentralConfig{
 				Files: []config.FileRule{
-					{Path: "README.md", Action: "create", Content: "matching content"},
+					{Path: "README.md", Mode: "create", Template: "matching content"},
 				},
 			},
 			repoCfg: &config.RepoConfig{Name: "test-repo"},
@@ -70,7 +69,7 @@ func TestComputeFindings(t *testing.T) {
 			name: "delete rule - file exists",
 			centralCfg: &config.CentralConfig{
 				Files: []config.FileRule{
-					{Path: "obsolete.txt", Action: "delete"},
+					{Path: "obsolete.txt", Mode: "delete"},
 				},
 			},
 			repoCfg: &config.RepoConfig{Name: "test-repo"},
@@ -85,7 +84,7 @@ func TestComputeFindings(t *testing.T) {
 			name: "delete rule - file does not exist",
 			centralCfg: &config.CentralConfig{
 				Files: []config.FileRule{
-					{Path: "obsolete.txt", Action: "delete"},
+					{Path: "obsolete.txt", Mode: "delete"},
 				},
 			},
 			repoCfg:        &config.RepoConfig{Name: "test-repo"},
@@ -97,13 +96,13 @@ func TestComputeFindings(t *testing.T) {
 			centralCfg: &config.CentralConfig{
 				Files: []config.FileRule{
 					{
-						Path:   "config.yaml",
-						Action: "partial",
+						Path: "config.yaml",
+						Mode: "partial",
 						Blocks: []config.BlockRule{
 							{
 								BeginMarker: "# BEGIN MANAGED",
 								EndMarker:   "# END MANAGED",
-								Content:     "new block content",
+								Template:    "new block content",
 							},
 						},
 					},
@@ -124,7 +123,7 @@ func TestComputeFindings(t *testing.T) {
 			name: "condition evaluates to false - no findings",
 			centralCfg: &config.CentralConfig{
 				Files: []config.FileRule{
-					{Path: "README.md", Action: "create", Content: "hello", Condition: "enabled"},
+					{Path: "README.md", Mode: "create", Template: "hello", Condition: "enabled"},
 				},
 			},
 			repoCfg: &config.RepoConfig{
@@ -138,7 +137,7 @@ func TestComputeFindings(t *testing.T) {
 			name: "template rendering with inputs",
 			centralCfg: &config.CentralConfig{
 				Files: []config.FileRule{
-					{Path: "greeting.txt", Action: "create", Content: "Hello {{.Name}} - {{.Inputs.lang}}"},
+					{Path: "greeting.txt", Mode: "create", Template: "Hello {{.Name}} - {{.Inputs.lang}}"},
 				},
 			},
 			repoCfg: &config.RepoConfig{
@@ -151,36 +150,105 @@ func TestComputeFindings(t *testing.T) {
 			wantExpected:  "Hello my-project - Go",
 		},
 		{
-			name: "template file rendering",
+			name: "condition with equality check",
 			centralCfg: &config.CentralConfig{
 				Files: []config.FileRule{
-					{Path: "from-template.txt", Action: "create", Template: "templates/test.tmpl"},
+					{Path: "go.mod", Mode: "create", Template: "module example", Condition: `language == "go"`},
 				},
 			},
-			repoCfg: &config.RepoConfig{Name: "tmpl-repo"},
-			setupRepo: func(t *testing.T, repoPath string) {},
-			setupConfig: func(t *testing.T, configRepoPath string) {
-				tmplDir := filepath.Join(configRepoPath, "templates")
-				os.MkdirAll(tmplDir, 0755)
-				os.WriteFile(filepath.Join(tmplDir, "test.tmpl"), []byte("Project: {{.Name}}"), 0644)
+			repoCfg: &config.RepoConfig{
+				Name:   "test-repo",
+				Inputs: map[string]interface{}{"language": "go"},
+			},
+			setupRepo:     func(t *testing.T, repoPath string) {},
+			wantFindings:  1,
+			wantOperation: "create",
+			wantExpected:  "module example",
+		},
+		{
+			name: "condition with inequality check - skips",
+			centralCfg: &config.CentralConfig{
+				Files: []config.FileRule{
+					{Path: "go.mod", Mode: "create", Template: "module example", Condition: `language == "python"`},
+				},
+			},
+			repoCfg: &config.RepoConfig{
+				Name:   "test-repo",
+				Inputs: map[string]interface{}{"language": "go"},
+			},
+			setupRepo:      func(t *testing.T, repoPath string) {},
+			wantNoFindings: true,
+		},
+		{
+			name: "partial rule - file does not exist creates managed blocks",
+			centralCfg: &config.CentralConfig{
+				Files: []config.FileRule{
+					{
+						Path: "new-partial.txt",
+						Mode: "partial",
+						Blocks: []config.BlockRule{
+							{
+								BeginMarker: "# BEGIN",
+								EndMarker:   "# END",
+								Template:    "managed line",
+							},
+						},
+					},
+				},
+			},
+			repoCfg:       &config.RepoConfig{Name: "test-repo"},
+			setupRepo:     func(t *testing.T, repoPath string) {},
+			wantFindings:  1,
+			wantOperation: "create",
+			wantExpected:  "# BEGIN\nmanaged line\n# END",
+		},
+		{
+			name: "multiple rules - mixed results",
+			centralCfg: &config.CentralConfig{
+				Files: []config.FileRule{
+					{Path: "exists.txt", Mode: "create", Template: "ok"},
+					{Path: "missing.txt", Mode: "create", Template: "needed"},
+				},
+			},
+			repoCfg: &config.RepoConfig{Name: "test-repo"},
+			setupRepo: func(t *testing.T, repoPath string) {
+				os.WriteFile(filepath.Join(repoPath, "exists.txt"), []byte("ok"), 0644)
 			},
 			wantFindings:  1,
 			wantOperation: "create",
-			wantExpected:  "Project: tmpl-repo",
+			wantMessage:   "file does not exist but should",
+		},
+		{
+			name: "template with conditional section",
+			centralCfg: &config.CentralConfig{
+				Files: []config.FileRule{
+					{
+						Path: "config.txt",
+						Mode: "create",
+						Template: `base config
+{{if .Inputs.debug}}debug: true
+{{end}}done`,
+					},
+				},
+			},
+			repoCfg: &config.RepoConfig{
+				Name:   "test-repo",
+				Inputs: map[string]interface{}{"debug": true},
+			},
+			setupRepo:     func(t *testing.T, repoPath string) {},
+			wantFindings:  1,
+			wantOperation: "create",
+			wantExpected:  "base config\ndebug: true\ndone",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repoPath := t.TempDir()
-			configRepoPath := t.TempDir()
 
 			tt.setupRepo(t, repoPath)
-			if tt.setupConfig != nil {
-				tt.setupConfig(t, configRepoPath)
-			}
 
-			findings, err := ComputeFindings(tt.repoCfg, tt.centralCfg, configRepoPath, repoPath)
+			findings, err := ComputeFindings(tt.repoCfg, tt.centralCfg, repoPath)
 			if err != nil {
 				t.Fatalf("ComputeFindings returned error: %v", err)
 			}
