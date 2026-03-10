@@ -1,0 +1,3 @@
+templates:
+  - condition: enable_license
+    template: licenses/mit.tmpl

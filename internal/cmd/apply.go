@@ -71,7 +71,7 @@ func runApply(version string, args []string) {
 	if *jsonFlag {
 		report.PrintJSON()
 	} else {
-		report.PrintHuman()
+		report.PrintHuman(false)
 	}
 
 	if report.HasFailures() {

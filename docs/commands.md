@@ -16,6 +16,7 @@ gitrepoforge validate [flags]
 |------|----------|-------------|
 | `--repo <name>` | no | Target a single repo by its directory name. |
 | `--json` | no | Output results as JSON instead of human-readable text. |
+| `--verbose` | no | In human-readable mode, print colorized git-style line diffs for each finding. |
 
 ### Behavior
 
@@ -26,6 +27,8 @@ gitrepoforge validate [flags]
    - Validates the per-repo config, including `default_branch`, against the shared config schema.
    - Selects template files, renders them, and compares them to the current file state.
 4. Reports each repo's status.
+
+When `--verbose` is set, drift findings also include per-file diffs showing removed lines in red and added lines in green.
 
 ### Statuses
 

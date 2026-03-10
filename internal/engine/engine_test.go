@@ -23,7 +23,7 @@ func writeTestFile(t *testing.T, dir, relPath, content string) string {
 
 func TestComputeFindingsSelectsMatchingTemplate(t *testing.T) {
 	configRepo := t.TempDir()
-	writeTestFile(t, configRepo, "templates/licenses/mit.tmpl", "MIT License\n")
+	writeTestFile(t, configRepo, "templates/licenses/mit.tmpl", "MIT License\n{{.Name}}\n")
 	writeTestFile(t, configRepo, "templates/licenses/apache-2.0.tmpl", "Apache License 2.0\n")
 
 	centralCfg := &config.CentralConfig{
@@ -60,8 +60,8 @@ func TestComputeFindingsSelectsMatchingTemplate(t *testing.T) {
 	if len(findings) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(findings))
 	}
-	if findings[0].Expected != "MIT License\n" {
-		t.Fatalf("Expected = %q, want %q", findings[0].Expected, "MIT License\n")
+	if findings[0].Expected != "MIT License\n{{.Name}}\n" {
+		t.Fatalf("Expected = %q, want %q", findings[0].Expected, "MIT License\n{{.Name}}\n")
 	}
 }
 
@@ -94,6 +94,146 @@ func TestComputeFindingsReturnsErrorWhenNoTemplateMatches(t *testing.T) {
 	_, err := ComputeFindings(repoCfg, centralCfg, t.TempDir())
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestComputeFindingsAppliesDefaultsBeforeSelectingTemplate(t *testing.T) {
+	configRepo := t.TempDir()
+	writeTestFile(t, configRepo, "templates/licenses/mit.tmpl", "MIT License\n")
+
+	centralCfg := &config.CentralConfig{
+		Definitions: []config.ConfigDefinition{
+			{Name: "license", Type: "string", Required: true, Default: "mit", HasDefault: true},
+		},
+		Files: []config.FileRule{
+			{
+				Path: "LICENSE",
+				Templates: []config.TemplateRef{
+					{
+						Condition:    `license == "mit"`,
+						Template:     "licenses/mit.tmpl",
+						ResolvedPath: filepath.Join(configRepo, "templates", "licenses", "mit.tmpl"),
+					},
+				},
+			},
+		},
+	}
+	repoCfg := &config.RepoConfig{
+		Name:          "example-repo",
+		DefaultBranch: "main",
+	}
+
+	findings, err := ComputeFindings(repoCfg, centralCfg, t.TempDir())
+	if err != nil {
+		t.Fatalf("ComputeFindings returned error: %v", err)
+	}
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(findings))
+	}
+	if repoCfg.Config["license"] != "mit" {
+		t.Fatalf("Config[license] = %v, want %q", repoCfg.Config["license"], "mit")
+	}
+}
+
+func TestComputeFindingsEvaluatesTemplateWhenRequested(t *testing.T) {
+	configRepo := t.TempDir()
+	writeTestFile(t, configRepo, "templates/justfile.tmpl", `# Commands for {{.Name}}
+default:
+  @just --list
+
+{{- if eq .Config.language "go" }}
+# Build {{.Name}} with Go
+build:
+  go build ./...
+{{- end }}
+{{- if eq .Config.language "java" }}
+# Build {{.Name}} with Maven
+build:
+  mvn package
+{{- end }}
+`)
+
+	centralCfg := &config.CentralConfig{
+		Files: []config.FileRule{
+			{
+				Path: "justfile",
+				Templates: []config.TemplateRef{
+					{
+						Condition:    "justfile",
+						Template:     "justfile.tmpl",
+						Evaluate:     true,
+						ResolvedPath: filepath.Join(configRepo, "templates", "justfile.tmpl"),
+					},
+					{
+						Absent: true,
+					},
+				},
+			},
+		},
+	}
+	repoCfg := &config.RepoConfig{
+		Name:          "example-repo",
+		DefaultBranch: "main",
+		Config: map[string]interface{}{
+			"justfile": true,
+			"language": "go",
+		},
+	}
+
+	findings, err := ComputeFindings(repoCfg, centralCfg, t.TempDir())
+	if err != nil {
+		t.Fatalf("ComputeFindings returned error: %v", err)
+	}
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(findings))
+	}
+	want := "# Commands for example-repo\ndefault:\n  @just --list\n# Build example-repo with Go\nbuild:\n  go build ./...\n"
+	if findings[0].Expected != want {
+		t.Fatalf("Expected = %q, want %q", findings[0].Expected, want)
+	}
+}
+
+func TestComputeFindingsDeletesFileWhenAbsentCandidateMatches(t *testing.T) {
+	configRepo := t.TempDir()
+	writeTestFile(t, configRepo, "templates/justfile.tmpl", "ignored")
+	repoPath := t.TempDir()
+	writeTestFile(t, repoPath, "justfile", "old content\n")
+
+	centralCfg := &config.CentralConfig{
+		Files: []config.FileRule{
+			{
+				Path: "justfile",
+				Templates: []config.TemplateRef{
+					{
+						Condition:    "justfile",
+						Template:     "justfile.tmpl",
+						Evaluate:     true,
+						ResolvedPath: filepath.Join(configRepo, "templates", "justfile.tmpl"),
+					},
+					{
+						Absent: true,
+					},
+				},
+			},
+		},
+	}
+	repoCfg := &config.RepoConfig{
+		Name:          "example-repo",
+		DefaultBranch: "main",
+		Config: map[string]interface{}{
+			"justfile": false,
+		},
+	}
+
+	findings, err := ComputeFindings(repoCfg, centralCfg, repoPath)
+	if err != nil {
+		t.Fatalf("ComputeFindings returned error: %v", err)
+	}
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(findings))
+	}
+	if findings[0].Operation != "delete" {
+		t.Fatalf("Operation = %q, want %q", findings[0].Operation, "delete")
 	}
 }
 

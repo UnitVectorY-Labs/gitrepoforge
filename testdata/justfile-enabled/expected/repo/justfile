@@ -1,0 +1,6 @@
+# Commands for repo
+default:
+  @just --list
+# Build repo with Go
+build:
+  go build ./...

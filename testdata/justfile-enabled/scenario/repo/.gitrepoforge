@@ -1,0 +1,5 @@
+name: repo
+default_branch: main
+config:
+  justfile: true
+  language: go

@@ -1,0 +1,6 @@
+type: string
+required: true
+default: mit
+enum:
+  - mit
+  - apache-2.0

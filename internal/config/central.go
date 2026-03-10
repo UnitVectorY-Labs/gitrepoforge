@@ -22,12 +22,13 @@ type CentralConfig struct {
 // ConfigDefinition defines a valid config value for per-repo configs.
 // Each definition is stored as its own file: config/<name>.yaml
 type ConfigDefinition struct {
-	Name        string   `yaml:"-"`
-	Type        string   `yaml:"type"`
-	Required    bool     `yaml:"required"`
-	Enum        []string `yaml:"enum"`
-	Default     string   `yaml:"default"`
-	Description string   `yaml:"description"`
+	Name        string      `yaml:"-"`
+	Type        string      `yaml:"type"`
+	Required    bool        `yaml:"required"`
+	Enum        []string    `yaml:"enum"`
+	Default     interface{} `yaml:"default"`
+	HasDefault  bool        `yaml:"-"`
+	Description string      `yaml:"description"`
 }
 
 // FileRule defines how an output file is managed.
@@ -42,6 +43,8 @@ type FileRule struct {
 type TemplateRef struct {
 	Condition    string `yaml:"condition"`
 	Template     string `yaml:"template"`
+	Evaluate     bool   `yaml:"evaluate"`
+	Absent       bool   `yaml:"absent"`
 	ResolvedPath string `yaml:"-"`
 }
 
@@ -51,6 +54,12 @@ const (
 	TemplatesDir     = "templates"
 	OutputFileSuffix = ".gitrepoforge"
 )
+
+var reservedConfigNames = map[string]struct{}{
+	"name":           {},
+	"default_branch": {},
+	"config":         {},
+}
 
 // LoadCentralConfig loads the central config from the config repo by scanning
 // the config/ and outputs/ directories for individual definition files.
@@ -107,6 +116,9 @@ func loadConfigDefinitions(configDir string) ([]ConfigDefinition, error) {
 			return nil, fmt.Errorf("failed to parse config file %s: %w", path, err)
 		}
 		def.Name = name
+		if err := validateDefinition(def); err != nil {
+			return nil, fmt.Errorf("invalid config file %s: %w", path, err)
+		}
 		definitions = append(definitions, def)
 	}
 
@@ -157,6 +169,12 @@ func loadOutputRules(outputsDir, templatesDir string) ([]FileRule, error) {
 			rule.Mode = "create"
 		}
 		for i := range rule.Templates {
+			if err := validateTemplateRef(rule.Templates[i]); err != nil {
+				return fmt.Errorf("output file %s: %w", path, err)
+			}
+			if rule.Templates[i].Absent {
+				continue
+			}
 			resolved, err := resolveTemplatePath(templatesDir, rule.Templates[i].Template)
 			if err != nil {
 				return fmt.Errorf("output file %s: %w", path, err)
@@ -191,4 +209,116 @@ func resolveTemplatePath(templatesDir, ref string) (string, error) {
 	}
 
 	return filepath.Join(templatesDir, cleanRef), nil
+}
+
+func validateTemplateRef(ref TemplateRef) error {
+	if ref.Absent {
+		if ref.Template != "" {
+			return fmt.Errorf("absent template candidate cannot also set template")
+		}
+		if ref.Evaluate {
+			return fmt.Errorf("absent template candidate cannot set evaluate")
+		}
+		return nil
+	}
+
+	if ref.Template == "" {
+		return fmt.Errorf("template is required unless absent is true")
+	}
+
+	return nil
+}
+
+func (d *ConfigDefinition) UnmarshalYAML(node *yaml.Node) error {
+	type plain ConfigDefinition
+	var value plain
+	if err := node.Decode(&value); err != nil {
+		return err
+	}
+	*d = ConfigDefinition(value)
+
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if node.Content[i].Value == "default" {
+			d.HasDefault = true
+			break
+		}
+	}
+
+	return nil
+}
+
+func validateDefinition(def ConfigDefinition) error {
+	if _, reserved := reservedConfigNames[def.Name]; reserved {
+		return fmt.Errorf("%q is reserved and cannot be used as a config key", def.Name)
+	}
+	if def.Type == "" {
+		return fmt.Errorf("type is required")
+	}
+	if !def.HasDefault {
+		return nil
+	}
+
+	if err := validateDefaultValue(def); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func IsReservedConfigName(name string) bool {
+	_, reserved := reservedConfigNames[name]
+	return reserved
+}
+
+func ApplyConfigDefaults(repoCfg *RepoConfig, centralCfg *CentralConfig) {
+	if repoCfg.Config == nil {
+		repoCfg.Config = map[string]interface{}{}
+	}
+
+	for _, def := range centralCfg.Definitions {
+		if !def.HasDefault {
+			continue
+		}
+		if _, exists := repoCfg.Config[def.Name]; exists {
+			continue
+		}
+		repoCfg.Config[def.Name] = def.Default
+	}
+}
+
+func validateDefaultValue(def ConfigDefinition) error {
+	switch def.Type {
+	case "string":
+		value, ok := def.Default.(string)
+		if !ok {
+			return fmt.Errorf("default must be a string")
+		}
+		if len(def.Enum) > 0 {
+			for _, allowed := range def.Enum {
+				if allowed == value {
+					return nil
+				}
+			}
+			return fmt.Errorf("default %q is not one of: %s", value, strings.Join(def.Enum, ", "))
+		}
+	case "boolean":
+		if _, ok := def.Default.(bool); !ok {
+			return fmt.Errorf("default must be a boolean")
+		}
+	case "number":
+		switch def.Default.(type) {
+		case int, int64, float64:
+			return nil
+		default:
+			return fmt.Errorf("default must be a number")
+		}
+	case "list":
+		if _, ok := def.Default.([]interface{}); !ok {
+			return fmt.Errorf("default must be a list")
+		}
+	default:
+		return fmt.Errorf("unsupported config type %q", def.Type)
+	}
+
+	return nil
 }

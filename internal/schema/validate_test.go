@@ -47,6 +47,31 @@ func TestValidateRepoConfig(t *testing.T) {
 		}
 	})
 
+	t.Run("default satisfies missing config value", func(t *testing.T) {
+		repoCfg := &config.RepoConfig{
+			Name:          "example-repo",
+			DefaultBranch: "main",
+			Config:        map[string]interface{}{},
+		}
+		cfgWithDefault := &config.CentralConfig{
+			Definitions: []config.ConfigDefinition{
+				{Name: "license", Type: "string", Required: true, Enum: []string{"mit"}, Default: "mit", HasDefault: true},
+				{Name: "enabled", Type: "boolean", Default: true, HasDefault: true},
+			},
+		}
+
+		errs := ValidateRepoConfig(repoCfg, cfgWithDefault, filepath.Join(t.TempDir(), "example-repo"))
+		if len(errs) != 0 {
+			t.Fatalf("expected no validation errors, got %v", errs)
+		}
+		if repoCfg.Config["license"] != "mit" {
+			t.Fatalf("Config[license] = %v, want %q", repoCfg.Config["license"], "mit")
+		}
+		if repoCfg.Config["enabled"] != true {
+			t.Fatalf("Config[enabled] = %v, want true", repoCfg.Config["enabled"])
+		}
+	})
+
 	t.Run("unknown config value", func(t *testing.T) {
 		repoCfg := &config.RepoConfig{
 			Name:          "example-repo",
@@ -63,6 +88,25 @@ func TestValidateRepoConfig(t *testing.T) {
 		}
 		if errs[0].Field != "config.other" {
 			t.Fatalf("Field = %q, want %q", errs[0].Field, "config.other")
+		}
+	})
+
+	t.Run("reserved top level field is rejected in config map", func(t *testing.T) {
+		repoCfg := &config.RepoConfig{
+			Name:          "example-repo",
+			DefaultBranch: "main",
+			Config: map[string]interface{}{
+				"license": "mit",
+				"name":    "bad",
+			},
+		}
+
+		errs := ValidateRepoConfig(repoCfg, centralCfg, filepath.Join(t.TempDir(), "example-repo"))
+		if len(errs) != 1 {
+			t.Fatalf("expected 1 validation error, got %d: %v", len(errs), errs)
+		}
+		if errs[0].Field != "config.name" {
+			t.Fatalf("Field = %q, want %q", errs[0].Field, "config.name")
 		}
 	})
 

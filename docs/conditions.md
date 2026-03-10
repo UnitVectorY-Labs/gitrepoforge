@@ -23,8 +23,8 @@ Conditions are only used to decide whether a template candidate matches. The res
 
 ```yaml
 templates:
-  - condition: license == "mit"
-    template: licenses/mit.tmpl
-  - condition: license == "apache-2.0"
-    template: licenses/apache-2.0.tmpl
+  - condition: justfile
+    template: justfile.tmpl
+    evaluate: true
+  - absent: true
 ```

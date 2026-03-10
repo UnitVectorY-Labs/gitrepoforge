@@ -1,0 +1,14 @@
+# Commands for {{.Name}}
+default:
+  @just --list
+
+{{- if eq .Config.language "go" }}
+# Build {{.Name}} with Go
+build:
+  go build ./...
+{{- end }}
+{{- if eq .Config.language "java" }}
+# Build {{.Name}} with Maven
+build:
+  mvn package
+{{- end }}

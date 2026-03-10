@@ -17,6 +17,7 @@ func runValidate(version string, args []string) {
 	fs := flag.NewFlagSet("validate", flag.ExitOnError)
 	repoFlag := fs.String("repo", "", "Target a single repo by folder name")
 	jsonFlag := fs.Bool("json", false, "Output in JSON format")
+	verboseFlag := fs.Bool("verbose", false, "Print colorized line diffs for drift findings")
 	fs.Parse(args)
 
 	workspaceDir, err := os.Getwd()
@@ -118,6 +119,8 @@ func runValidate(version string, args []string) {
 					FilePath:  f.FilePath,
 					Operation: f.Operation,
 					Message:   f.Message,
+					Expected:  f.Expected,
+					Actual:    f.Actual,
 				})
 			}
 			report.Repos = append(report.Repos, output.RepoResult{
@@ -131,7 +134,7 @@ func runValidate(version string, args []string) {
 	if *jsonFlag {
 		report.PrintJSON()
 	} else {
-		report.PrintHuman()
+		report.PrintHuman(*verboseFlag)
 	}
 
 	if report.HasFailures() {

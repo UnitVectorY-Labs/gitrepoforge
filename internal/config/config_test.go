@@ -40,9 +40,13 @@ func TestLoadCentralConfig(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "config/license.yaml", `type: string
 required: true
+default: mit
 enum:
   - mit
   - apache-2.0
+`)
+	writeFile(t, dir, "config/enabled.yaml", `type: boolean
+default: true
 `)
 	writeFile(t, dir, "outputs/LICENSE.gitrepoforge", `templates:
   - condition: license == "mit"
@@ -58,13 +62,21 @@ enum:
 		t.Fatalf("LoadCentralConfig returned error: %v", err)
 	}
 
-	if len(cfg.Definitions) != 1 {
-		t.Fatalf("Definitions length = %d, want 1", len(cfg.Definitions))
+	if len(cfg.Definitions) != 2 {
+		t.Fatalf("Definitions length = %d, want 2", len(cfg.Definitions))
 	}
-	if cfg.Definitions[0].Name != "license" {
-		t.Fatalf("Definitions[0].Name = %q, want %q", cfg.Definitions[0].Name, "license")
+	if cfg.Definitions[0].Name != "enabled" {
+		t.Fatalf("Definitions[0].Name = %q, want %q", cfg.Definitions[0].Name, "enabled")
 	}
-
+	if cfg.Definitions[0].Default != true {
+		t.Fatalf("Definitions[0].Default = %v, want true", cfg.Definitions[0].Default)
+	}
+	if cfg.Definitions[1].Name != "license" {
+		t.Fatalf("Definitions[1].Name = %q, want %q", cfg.Definitions[1].Name, "license")
+	}
+	if cfg.Definitions[1].Default != "mit" {
+		t.Fatalf("Definitions[1].Default = %v, want %q", cfg.Definitions[1].Default, "mit")
+	}
 	if len(cfg.Files) != 1 {
 		t.Fatalf("Files length = %d, want 1", len(cfg.Files))
 	}
@@ -77,6 +89,71 @@ enum:
 	}
 	if !strings.HasSuffix(rule.Templates[0].ResolvedPath, filepath.Join("templates", "licenses", "mit.tmpl")) {
 		t.Fatalf("unexpected resolved template path %q", rule.Templates[0].ResolvedPath)
+	}
+	if rule.Templates[0].Evaluate {
+		t.Fatalf("Evaluate = true, want false by default")
+	}
+}
+
+func TestLoadCentralConfigSupportsAbsentTemplateCandidate(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "outputs/justfile.gitrepoforge", `templates:
+  - condition: justfile
+    template: justfile.tmpl
+    evaluate: true
+  - absent: true
+`)
+	writeFile(t, dir, "templates/justfile.tmpl", "test")
+
+	cfg, err := LoadCentralConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadCentralConfig returned error: %v", err)
+	}
+
+	rule := cfg.Files[0]
+	if len(rule.Templates) != 2 {
+		t.Fatalf("Templates length = %d, want 2", len(rule.Templates))
+	}
+	if !rule.Templates[0].Evaluate {
+		t.Fatalf("Evaluate = false, want true")
+	}
+	if !rule.Templates[1].Absent {
+		t.Fatalf("Absent = false, want true")
+	}
+}
+
+func TestLoadCentralConfigRejectsReservedConfigName(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "config/name.yaml", "type: string\n")
+
+	_, err := LoadCentralConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), `"name" is reserved`) {
+		t.Fatalf("unexpected error %q", err)
+	}
+}
+
+func TestApplyConfigDefaults(t *testing.T) {
+	repoCfg := &RepoConfig{
+		Name:          "example-repo",
+		DefaultBranch: "main",
+	}
+	centralCfg := &CentralConfig{
+		Definitions: []ConfigDefinition{
+			{Name: "license", Type: "string", Default: "mit", HasDefault: true},
+			{Name: "enabled", Type: "boolean", Default: true, HasDefault: true},
+		},
+	}
+
+	ApplyConfigDefaults(repoCfg, centralCfg)
+
+	if repoCfg.Config["license"] != "mit" {
+		t.Fatalf("Config[license] = %v, want %q", repoCfg.Config["license"], "mit")
+	}
+	if repoCfg.Config["enabled"] != true {
+		t.Fatalf("Config[enabled] = %v, want true", repoCfg.Config["enabled"])
 	}
 }
 
@@ -92,6 +169,22 @@ func TestLoadCentralConfigRejectsTemplateOutsideTemplatesDir(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "must stay within templates") {
 		t.Fatalf("error %q does not mention template directory boundary", err)
+	}
+}
+
+func TestLoadCentralConfigRejectsAbsentTemplateWithTemplatePath(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "outputs/justfile.gitrepoforge", `templates:
+  - absent: true
+    template: justfile.tmpl
+`)
+
+	_, err := LoadCentralConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "cannot also set template") {
+		t.Fatalf("unexpected error %q", err)
 	}
 }
 

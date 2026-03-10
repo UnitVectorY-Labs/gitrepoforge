@@ -23,17 +23,21 @@ type Finding struct {
 
 // TemplateData is the data passed to template files for rendering.
 type TemplateData struct {
-	Name   string
-	Config map[string]interface{}
+	Name          string
+	DefaultBranch string
+	Config        map[string]interface{}
 }
 
 // ComputeFindings computes the compliance findings for a repo.
 func ComputeFindings(repoCfg *config.RepoConfig, centralCfg *config.CentralConfig, repoPath string) ([]Finding, error) {
 	var findings []Finding
 
+	config.ApplyConfigDefaults(repoCfg, centralCfg)
+
 	data := TemplateData{
-		Name:   repoCfg.Name,
-		Config: repoCfg.Config,
+		Name:          repoCfg.Name,
+		DefaultBranch: repoCfg.DefaultBranch,
+		Config:        repoCfg.Config,
 	}
 
 	for _, rule := range centralCfg.Files {
@@ -86,7 +90,11 @@ func evaluateCreateRule(rule config.FileRule, data TemplateData, repoPath string
 		return nil, err
 	}
 
-	expected, err := renderTemplateFile(selected.ResolvedPath, data)
+	if selected.Absent {
+		return evaluateDeleteRule(rule, repoPath)
+	}
+
+	expected, err := materializeTemplateFile(selected, data)
 	if err != nil {
 		return nil, err
 	}
@@ -121,10 +129,15 @@ func evaluateCreateRule(rule config.FileRule, data TemplateData, repoPath string
 func evaluateDeleteRule(rule config.FileRule, repoPath string) ([]Finding, error) {
 	filePath := filepath.Join(repoPath, rule.Path)
 	if _, err := os.Stat(filePath); err == nil {
+		actual, readErr := os.ReadFile(filePath)
+		if readErr != nil {
+			return nil, fmt.Errorf("failed to read %s: %w", filePath, readErr)
+		}
 		return []Finding{{
 			FilePath:  rule.Path,
 			Operation: "delete",
 			Message:   "file exists but should not",
+			Actual:    string(actual),
 		}}, nil
 	}
 	return nil, nil
@@ -146,6 +159,18 @@ func selectTemplate(rule config.FileRule, data TemplateData) (config.TemplateRef
 	}
 
 	return config.TemplateRef{}, fmt.Errorf("no template matched")
+}
+
+func materializeTemplateFile(selected config.TemplateRef, data TemplateData) (string, error) {
+	if !selected.Evaluate {
+		content, err := os.ReadFile(selected.ResolvedPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to read template %s: %w", selected.ResolvedPath, err)
+		}
+		return string(content), nil
+	}
+
+	return renderTemplateFile(selected.ResolvedPath, data)
 }
 
 func renderTemplateFile(path string, data TemplateData) (string, error) {

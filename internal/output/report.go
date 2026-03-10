@@ -24,10 +24,10 @@ type ToolMeta struct {
 
 // RepoResult represents the result for a single repository.
 type RepoResult struct {
-	Name             string           `json:"repo"`
-	Status           string           `json:"status"`
-	ValidationErrors []string         `json:"validation_errors,omitempty"`
-	Findings         []FindingOutput  `json:"findings,omitempty"`
+	Name             string          `json:"repo"`
+	Status           string          `json:"status"`
+	ValidationErrors []string        `json:"validation_errors,omitempty"`
+	Findings         []FindingOutput `json:"findings,omitempty"`
 }
 
 // FindingOutput is the JSON representation of a finding.
@@ -35,6 +35,8 @@ type FindingOutput struct {
 	FilePath  string `json:"file_path"`
 	Operation string `json:"operation"`
 	Message   string `json:"message"`
+	Expected  string `json:"-"`
+	Actual    string `json:"-"`
 }
 
 // NewReport creates a new report.
@@ -62,7 +64,7 @@ func (r *Report) PrintJSON() error {
 }
 
 // PrintHuman outputs the report in human-readable format.
-func (r *Report) PrintHuman() {
+func (r *Report) PrintHuman(verbose bool) {
 	for _, repo := range r.Repos {
 		switch repo.Status {
 		case "clean":
@@ -78,6 +80,11 @@ func (r *Report) PrintHuman() {
 			Warning(fmt.Sprintf("%s: non-compliant (%d findings)", repo.Name, len(repo.Findings)))
 			for _, f := range repo.Findings {
 				Detail(fmt.Sprintf("  [%s] %s: %s", f.Operation, f.FilePath, f.Message))
+				if verbose {
+					for _, line := range RenderDiff(f) {
+						Detail("  " + line)
+					}
+				}
 			}
 		case "applied":
 			Success(fmt.Sprintf("%s: changes applied", repo.Name))

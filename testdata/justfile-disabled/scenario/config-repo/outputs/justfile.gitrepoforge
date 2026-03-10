@@ -1,0 +1,5 @@
+templates:
+  - condition: justfile
+    template: justfile.tmpl
+    evaluate: true
+  - absent: true

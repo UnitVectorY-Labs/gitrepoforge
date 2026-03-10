@@ -26,6 +26,8 @@ func (e ValidationError) Error() string {
 func ValidateRepoConfig(repoCfg *config.RepoConfig, centralCfg *config.CentralConfig, repoPath string) []ValidationError {
 	var errors []ValidationError
 
+	config.ApplyConfigDefaults(repoCfg, centralCfg)
+
 	// Check that repo name matches folder name
 	folderName := filepath.Base(repoPath)
 	if repoCfg.Name == "" {
@@ -63,6 +65,13 @@ func ValidateRepoConfig(repoCfg *config.RepoConfig, centralCfg *config.CentralCo
 
 	if repoCfg.Config != nil {
 		for key := range repoCfg.Config {
+			if config.IsReservedConfigName(key) {
+				errors = append(errors, ValidationError{
+					Field:   fmt.Sprintf("config.%s", key),
+					Message: "reserved top-level field name cannot be used in config",
+				})
+				continue
+			}
 			if _, ok := allowedConfig[key]; !ok {
 				errors = append(errors, ValidationError{
 					Field:   fmt.Sprintf("config.%s", key),
