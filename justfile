@@ -1,12 +1,12 @@
-# List all available commands
+
+# Commands for gitrepoforge
 default:
   @just --list
-
-# Build the Go application
+# Build gitrepoforge with Go
 build:
   go build ./...
 
-# Run the Go tests
+# Run tests for gitrepoforge with Go
 test:
   go clean -testcache
   go test ./...
