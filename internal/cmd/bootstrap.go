@@ -188,7 +188,7 @@ func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centra
 		}
 	}
 
-	if err := gitops.Commit(repoPath, "gitrepoforge: bootstrap repo"); err != nil {
+	if err := gitops.Commit(repoPath, rootCfg.Git.BootstrapCommitMessage); err != nil {
 		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
 		return output.RepoResult{
 			Name:             repoName,
@@ -197,28 +197,39 @@ func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centra
 		}
 	}
 
-	// Push
-	if err := gitops.Push(repoPath, branchName); err != nil {
+	// Push if configured
+	if *rootCfg.Git.Push {
+		if err := gitops.Push(repoPath, rootCfg.Git.Remote, branchName); err != nil {
+			gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
+			return output.RepoResult{
+				Name:             repoName,
+				Status:           "failed",
+				ValidationErrors: []string{fmt.Sprintf("failed to push: %v", err)},
+			}
+		}
+
+		// Create PR if configured
+		if rootCfg.Git.PullRequest == config.PullRequestGitHubCLI {
+			err := gitops.CreatePR(repoPath, branchName, repoCfg.DefaultBranch,
+				rootCfg.Git.BootstrapPRTitle,
+				rootCfg.Git.BootstrapPRBody)
+			if err != nil {
+				output.Warning(fmt.Sprintf("%s: PR creation failed: %v", repoName, err))
+			}
+		}
+	}
+
+	// Return to original branch if configured
+	if *rootCfg.Git.ReturnToOriginalBranch {
 		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
-		return output.RepoResult{
-			Name:             repoName,
-			Status:           "failed",
-			ValidationErrors: []string{fmt.Sprintf("failed to push: %v", err)},
+
+		// Delete the branch if configured
+		if rootCfg.Git.DeleteBranch {
+			if err := gitops.DeleteBranch(repoPath, branchName); err != nil {
+				output.Warning(fmt.Sprintf("%s: failed to delete branch %s: %v", repoName, branchName, err))
+			}
 		}
 	}
-
-	// Create PR if configured
-	if rootCfg.Git.PullRequest == config.PullRequestGitHubCLI {
-		err := gitops.CreatePR(repoPath, branchName, repoCfg.DefaultBranch,
-			rootCfg.Git.BootstrapPRTitle,
-			rootCfg.Git.BootstrapPRBody)
-		if err != nil {
-			output.Warning(fmt.Sprintf("%s: PR creation failed: %v", repoName, err))
-		}
-	}
-
-	// Return to default branch
-	gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
 
 	var findingOutputs []output.FindingOutput
 	for _, f := range findings {

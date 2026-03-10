@@ -212,7 +212,7 @@ func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg
 		}
 	}
 
-	if err := gitops.Commit(repoPath, "gitrepoforge: apply desired state"); err != nil {
+	if err := gitops.Commit(repoPath, rootCfg.Git.CommitMessage); err != nil {
 		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
 		return output.RepoResult{
 			Name:             repoName,
@@ -221,32 +221,43 @@ func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg
 		}
 	}
 
-	// Push
-	if err := gitops.Push(repoPath, branchName); err != nil {
-		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
-		return output.RepoResult{
-			Name:             repoName,
-			Status:           "failed",
-			ValidationErrors: []string{fmt.Sprintf("failed to push: %v", err)},
+	// Push if configured
+	if *rootCfg.Git.Push {
+		if err := gitops.Push(repoPath, rootCfg.Git.Remote, branchName); err != nil {
+			gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
+			return output.RepoResult{
+				Name:             repoName,
+				Status:           "failed",
+				ValidationErrors: []string{fmt.Sprintf("failed to push: %v", err)},
+			}
 		}
-	}
 
-	// Create PR if configured and remote branch didn't already exist
-	if rootCfg.Git.PullRequest == config.PullRequestGitHubCLI {
-		if remoteBranchExists {
-			output.Warning(fmt.Sprintf("%s: remote branch %s already exists; skipping PR creation", repoName, branchName))
-		} else {
-			err := gitops.CreatePR(repoPath, branchName, repoCfg.DefaultBranch,
-				rootCfg.Git.PRTitle,
-				rootCfg.Git.PRBody)
-			if err != nil {
-				output.Warning(fmt.Sprintf("%s: PR creation failed: %v", repoName, err))
+		// Create PR if configured and remote branch didn't already exist
+		if rootCfg.Git.PullRequest == config.PullRequestGitHubCLI {
+			if remoteBranchExists {
+				output.Warning(fmt.Sprintf("%s: remote branch %s already exists; skipping PR creation", repoName, branchName))
+			} else {
+				err := gitops.CreatePR(repoPath, branchName, repoCfg.DefaultBranch,
+					rootCfg.Git.PRTitle,
+					rootCfg.Git.PRBody)
+				if err != nil {
+					output.Warning(fmt.Sprintf("%s: PR creation failed: %v", repoName, err))
+				}
 			}
 		}
 	}
 
-	// Return to default branch
-	gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
+	// Return to original branch if configured
+	if *rootCfg.Git.ReturnToOriginalBranch {
+		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
+
+		// Delete the branch if configured
+		if rootCfg.Git.DeleteBranch {
+			if err := gitops.DeleteBranch(repoPath, branchName); err != nil {
+				output.Warning(fmt.Sprintf("%s: failed to delete branch %s: %v", repoName, branchName, err))
+			}
+		}
+	}
 
 	var findingOutputs []output.FindingOutput
 	for _, f := range findings {

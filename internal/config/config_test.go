@@ -188,6 +188,269 @@ func TestLoadCentralConfigRejectsAbsentTemplateWithTemplatePath(t *testing.T) {
 	}
 }
 
+func TestLoadRootConfigGitSection(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
+git:
+  branch_prefix: custom/
+  commit_message: "custom commit"
+  bootstrap_commit_message: "custom bootstrap"
+  push: true
+  remote: upstream
+  pull_request: GITHUB_CLI
+  pr_title: "Custom PR"
+  pr_body: "Custom body"
+  bootstrap_pr_title: "Bootstrap PR"
+  bootstrap_pr_body: "Bootstrap body"
+  return_to_original_branch: true
+  delete_branch: true
+`)
+
+	cfg, err := LoadRootConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadRootConfig returned error: %v", err)
+	}
+
+	if cfg.Git.BranchPrefix != "custom/" {
+		t.Fatalf("Git.BranchPrefix = %q, want %q", cfg.Git.BranchPrefix, "custom/")
+	}
+	if cfg.Git.CommitMessage != "custom commit" {
+		t.Fatalf("Git.CommitMessage = %q, want %q", cfg.Git.CommitMessage, "custom commit")
+	}
+	if cfg.Git.BootstrapCommitMessage != "custom bootstrap" {
+		t.Fatalf("Git.BootstrapCommitMessage = %q, want %q", cfg.Git.BootstrapCommitMessage, "custom bootstrap")
+	}
+	if !*cfg.Git.Push {
+		t.Fatalf("Git.Push = false, want true")
+	}
+	if cfg.Git.Remote != "upstream" {
+		t.Fatalf("Git.Remote = %q, want %q", cfg.Git.Remote, "upstream")
+	}
+	if cfg.Git.PullRequest != PullRequestGitHubCLI {
+		t.Fatalf("Git.PullRequest = %q, want %q", cfg.Git.PullRequest, PullRequestGitHubCLI)
+	}
+	if cfg.Git.PRTitle != "Custom PR" {
+		t.Fatalf("Git.PRTitle = %q, want %q", cfg.Git.PRTitle, "Custom PR")
+	}
+	if cfg.Git.PRBody != "Custom body" {
+		t.Fatalf("Git.PRBody = %q, want %q", cfg.Git.PRBody, "Custom body")
+	}
+	if cfg.Git.BootstrapPRTitle != "Bootstrap PR" {
+		t.Fatalf("Git.BootstrapPRTitle = %q, want %q", cfg.Git.BootstrapPRTitle, "Bootstrap PR")
+	}
+	if cfg.Git.BootstrapPRBody != "Bootstrap body" {
+		t.Fatalf("Git.BootstrapPRBody = %q, want %q", cfg.Git.BootstrapPRBody, "Bootstrap body")
+	}
+	if !*cfg.Git.ReturnToOriginalBranch {
+		t.Fatalf("Git.ReturnToOriginalBranch = false, want true")
+	}
+	if !cfg.Git.DeleteBranch {
+		t.Fatalf("Git.DeleteBranch = false, want true")
+	}
+}
+
+func TestLoadRootConfigGitDefaults(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, "config_repo: config-repo\n")
+
+	cfg, err := LoadRootConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadRootConfig returned error: %v", err)
+	}
+
+	if cfg.Git.BranchPrefix != "gitrepoforge/" {
+		t.Fatalf("Git.BranchPrefix = %q, want %q", cfg.Git.BranchPrefix, "gitrepoforge/")
+	}
+	if cfg.Git.CommitMessage != "gitrepoforge: apply desired state" {
+		t.Fatalf("Git.CommitMessage = %q, want default", cfg.Git.CommitMessage)
+	}
+	if cfg.Git.BootstrapCommitMessage != "gitrepoforge: bootstrap repo" {
+		t.Fatalf("Git.BootstrapCommitMessage = %q, want default", cfg.Git.BootstrapCommitMessage)
+	}
+	if !*cfg.Git.Push {
+		t.Fatalf("Git.Push = false, want true (default)")
+	}
+	if cfg.Git.Remote != "origin" {
+		t.Fatalf("Git.Remote = %q, want %q", cfg.Git.Remote, "origin")
+	}
+	if cfg.Git.PullRequest != PullRequestNo {
+		t.Fatalf("Git.PullRequest = %q, want %q", cfg.Git.PullRequest, PullRequestNo)
+	}
+	if cfg.Git.PRTitle != cfg.Git.CommitMessage {
+		t.Fatalf("Git.PRTitle = %q, want commit message as default", cfg.Git.PRTitle)
+	}
+	if cfg.Git.PRBody != "Automated changes applied by gitrepoforge." {
+		t.Fatalf("Git.PRBody = %q, want default", cfg.Git.PRBody)
+	}
+	if cfg.Git.BootstrapPRTitle != cfg.Git.BootstrapCommitMessage {
+		t.Fatalf("Git.BootstrapPRTitle = %q, want bootstrap commit message as default", cfg.Git.BootstrapPRTitle)
+	}
+	if cfg.Git.BootstrapPRBody != "Automated bootstrap by gitrepoforge." {
+		t.Fatalf("Git.BootstrapPRBody = %q, want default", cfg.Git.BootstrapPRBody)
+	}
+	if !*cfg.Git.ReturnToOriginalBranch {
+		t.Fatalf("Git.ReturnToOriginalBranch = false, want true (default)")
+	}
+	if cfg.Git.DeleteBranch {
+		t.Fatalf("Git.DeleteBranch = true, want false (default)")
+	}
+}
+
+func TestLoadRootConfigBackwardCompatBranchPrefix(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
+branch_prefix: legacy/
+`)
+
+	cfg, err := LoadRootConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadRootConfig returned error: %v", err)
+	}
+
+	if cfg.Git.BranchPrefix != "legacy/" {
+		t.Fatalf("Git.BranchPrefix = %q, want %q from legacy field", cfg.Git.BranchPrefix, "legacy/")
+	}
+}
+
+func TestLoadRootConfigBackwardCompatCreatePR(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
+create_pr: true
+`)
+
+	cfg, err := LoadRootConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadRootConfig returned error: %v", err)
+	}
+
+	if cfg.Git.PullRequest != PullRequestGitHubCLI {
+		t.Fatalf("Git.PullRequest = %q, want %q from legacy create_pr: true", cfg.Git.PullRequest, PullRequestGitHubCLI)
+	}
+}
+
+func TestLoadRootConfigBackwardCompatCreatePRFalse(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
+create_pr: false
+`)
+
+	cfg, err := LoadRootConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadRootConfig returned error: %v", err)
+	}
+
+	if cfg.Git.PullRequest != PullRequestNo {
+		t.Fatalf("Git.PullRequest = %q, want %q from legacy create_pr: false", cfg.Git.PullRequest, PullRequestNo)
+	}
+}
+
+func TestLoadRootConfigGitSectionOverridesLegacy(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
+branch_prefix: legacy/
+create_pr: true
+git:
+  branch_prefix: modern/
+  pull_request: "NO"
+`)
+
+	cfg, err := LoadRootConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadRootConfig returned error: %v", err)
+	}
+
+	if cfg.Git.BranchPrefix != "modern/" {
+		t.Fatalf("Git.BranchPrefix = %q, want %q (git section takes precedence)", cfg.Git.BranchPrefix, "modern/")
+	}
+	if cfg.Git.PullRequest != PullRequestNo {
+		t.Fatalf("Git.PullRequest = %q, want %q (git section takes precedence)", cfg.Git.PullRequest, PullRequestNo)
+	}
+}
+
+func TestLoadRootConfigRejectsInvalidPullRequest(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
+git:
+  pull_request: INVALID
+`)
+
+	_, err := LoadRootConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "git.pull_request") {
+		t.Fatalf("error %q does not mention git.pull_request", err)
+	}
+}
+
+func TestLoadRootConfigRejectsPRWithoutPush(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
+git:
+  push: false
+  pull_request: GITHUB_CLI
+`)
+
+	_, err := LoadRootConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "git.push is false") {
+		t.Fatalf("error %q does not mention push constraint", err)
+	}
+}
+
+func TestLoadRootConfigRejectsDeleteBranchWithoutReturn(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
+git:
+  return_to_original_branch: false
+  delete_branch: true
+`)
+
+	_, err := LoadRootConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "delete_branch requires") {
+		t.Fatalf("error %q does not mention delete_branch constraint", err)
+	}
+}
+
+func TestLoadRootConfigPushFalse(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
+git:
+  push: false
+`)
+
+	cfg, err := LoadRootConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadRootConfig returned error: %v", err)
+	}
+
+	if *cfg.Git.Push {
+		t.Fatalf("Git.Push = true, want false")
+	}
+}
+
+func TestLoadRootConfigPullRequestCaseInsensitive(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
+git:
+  pull_request: github_cli
+`)
+
+	cfg, err := LoadRootConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadRootConfig returned error: %v", err)
+	}
+
+	if cfg.Git.PullRequest != PullRequestGitHubCLI {
+		t.Fatalf("Git.PullRequest = %q, want %q (normalized to upper case)", cfg.Git.PullRequest, PullRequestGitHubCLI)
+	}
+}
+
 func TestLoadRepoConfig(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RepoConfigFileName, `name: example-repo
