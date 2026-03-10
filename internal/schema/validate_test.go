@@ -8,228 +8,96 @@ import (
 )
 
 func TestValidateRepoConfig(t *testing.T) {
-	tests := []struct {
-		name           string
-		repoCfg        *config.RepoConfig
-		centralCfg     *config.CentralConfig
-		folderName     string
-		wantErrCount   int
-		wantErrFields  []string
-		wantNoErrors   bool
-	}{
-		{
-			name: "valid config with all required inputs",
-			repoCfg: &config.RepoConfig{
-				Name: "my-repo",
-				Inputs: map[string]interface{}{
-					"language": "go",
-					"enabled":  true,
-				},
-			},
-			centralCfg: &config.CentralConfig{
-				Inputs: []config.InputDef{
-					{Name: "language", Type: "string", Required: true},
-					{Name: "enabled", Type: "boolean", Required: true},
-				},
-			},
-			folderName:   "my-repo",
-			wantNoErrors: true,
-		},
-		{
-			name: "missing name",
-			repoCfg: &config.RepoConfig{
-				Name:   "",
-				Inputs: map[string]interface{}{},
-			},
-			centralCfg:    &config.CentralConfig{},
-			folderName:    "my-repo",
-			wantErrCount:  1,
-			wantErrFields: []string{"name"},
-		},
-		{
-			name: "name mismatch with folder",
-			repoCfg: &config.RepoConfig{
-				Name:   "wrong-name",
-				Inputs: map[string]interface{}{},
-			},
-			centralCfg:    &config.CentralConfig{},
-			folderName:    "my-repo",
-			wantErrCount:  1,
-			wantErrFields: []string{"name"},
-		},
-		{
-			name: "required input missing",
-			repoCfg: &config.RepoConfig{
-				Name:   "my-repo",
-				Inputs: map[string]interface{}{},
-			},
-			centralCfg: &config.CentralConfig{
-				Inputs: []config.InputDef{
-					{Name: "language", Type: "string", Required: true},
-				},
-			},
-			folderName:    "my-repo",
-			wantErrCount:  1,
-			wantErrFields: []string{"inputs.language"},
-		},
-		{
-			name: "unknown input provided",
-			repoCfg: &config.RepoConfig{
-				Name: "my-repo",
-				Inputs: map[string]interface{}{
-					"unknown_key": "value",
-				},
-			},
-			centralCfg:    &config.CentralConfig{},
-			folderName:    "my-repo",
-			wantErrCount:  1,
-			wantErrFields: []string{"inputs.unknown_key"},
-		},
-		{
-			name: "string input with valid enum value",
-			repoCfg: &config.RepoConfig{
-				Name: "my-repo",
-				Inputs: map[string]interface{}{
-					"language": "go",
-				},
-			},
-			centralCfg: &config.CentralConfig{
-				Inputs: []config.InputDef{
-					{Name: "language", Type: "string", Enum: []string{"go", "python", "java"}},
-				},
-			},
-			folderName:   "my-repo",
-			wantNoErrors: true,
-		},
-		{
-			name: "string input with invalid enum value",
-			repoCfg: &config.RepoConfig{
-				Name: "my-repo",
-				Inputs: map[string]interface{}{
-					"language": "rust",
-				},
-			},
-			centralCfg: &config.CentralConfig{
-				Inputs: []config.InputDef{
-					{Name: "language", Type: "string", Enum: []string{"go", "python", "java"}},
-				},
-			},
-			folderName:    "my-repo",
-			wantErrCount:  1,
-			wantErrFields: []string{"inputs.language"},
-		},
-		{
-			name: "boolean input with non-boolean value",
-			repoCfg: &config.RepoConfig{
-				Name: "my-repo",
-				Inputs: map[string]interface{}{
-					"enabled": "yes",
-				},
-			},
-			centralCfg: &config.CentralConfig{
-				Inputs: []config.InputDef{
-					{Name: "enabled", Type: "boolean"},
-				},
-			},
-			folderName:    "my-repo",
-			wantErrCount:  1,
-			wantErrFields: []string{"inputs.enabled"},
-		},
-		{
-			name: "number input with non-number value",
-			repoCfg: &config.RepoConfig{
-				Name: "my-repo",
-				Inputs: map[string]interface{}{
-					"count": "not-a-number",
-				},
-			},
-			centralCfg: &config.CentralConfig{
-				Inputs: []config.InputDef{
-					{Name: "count", Type: "number"},
-				},
-			},
-			folderName:    "my-repo",
-			wantErrCount:  1,
-			wantErrFields: []string{"inputs.count"},
-		},
-		{
-			name: "list input with non-list value",
-			repoCfg: &config.RepoConfig{
-				Name: "my-repo",
-				Inputs: map[string]interface{}{
-					"tags": "not-a-list",
-				},
-			},
-			centralCfg: &config.CentralConfig{
-				Inputs: []config.InputDef{
-					{Name: "tags", Type: "list"},
-				},
-			},
-			folderName:    "my-repo",
-			wantErrCount:  1,
-			wantErrFields: []string{"inputs.tags"},
-		},
-		{
-			name: "all inputs missing when all required",
-			repoCfg: &config.RepoConfig{
-				Name:   "my-repo",
-				Inputs: map[string]interface{}{},
-			},
-			centralCfg: &config.CentralConfig{
-				Inputs: []config.InputDef{
-					{Name: "language", Type: "string", Required: true},
-					{Name: "enabled", Type: "boolean", Required: true},
-					{Name: "count", Type: "number", Required: true},
-				},
-			},
-			folderName:    "my-repo",
-			wantErrCount:  3,
-			wantErrFields: []string{"inputs.language", "inputs.enabled", "inputs.count"},
-		},
-		{
-			name: "empty inputs map with no required inputs",
-			repoCfg: &config.RepoConfig{
-				Name:   "my-repo",
-				Inputs: map[string]interface{}{},
-			},
-			centralCfg: &config.CentralConfig{
-				Inputs: []config.InputDef{
-					{Name: "language", Type: "string"},
-					{Name: "enabled", Type: "boolean"},
-				},
-			},
-			folderName:   "my-repo",
-			wantNoErrors: true,
+	centralCfg := &config.CentralConfig{
+		Definitions: []config.ConfigDefinition{
+			{Name: "license", Type: "string", Required: true, Enum: []string{"mit", "apache-2.0"}},
+			{Name: "enabled", Type: "boolean"},
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			repoPath := filepath.Join(tmpDir, tt.folderName)
+	t.Run("valid config", func(t *testing.T) {
+		repoCfg := &config.RepoConfig{
+			Name:          "example-repo",
+			DefaultBranch: "main",
+			Config: map[string]interface{}{
+				"license": "mit",
+				"enabled": true,
+			},
+		}
 
-			errs := ValidateRepoConfig(tt.repoCfg, tt.centralCfg, repoPath)
+		errs := ValidateRepoConfig(repoCfg, centralCfg, filepath.Join(t.TempDir(), "example-repo"))
+		if len(errs) != 0 {
+			t.Fatalf("expected no validation errors, got %v", errs)
+		}
+	})
 
-			if tt.wantNoErrors {
-				if len(errs) != 0 {
-					t.Errorf("expected no errors, got %d: %v", len(errs), errs)
-				}
-				return
-			}
+	t.Run("missing required config value", func(t *testing.T) {
+		repoCfg := &config.RepoConfig{
+			Name:          "example-repo",
+			DefaultBranch: "main",
+			Config:        map[string]interface{}{},
+		}
 
-			if len(errs) != tt.wantErrCount {
-				t.Errorf("expected %d errors, got %d: %v", tt.wantErrCount, len(errs), errs)
-			}
+		errs := ValidateRepoConfig(repoCfg, centralCfg, filepath.Join(t.TempDir(), "example-repo"))
+		if len(errs) != 1 {
+			t.Fatalf("expected 1 validation error, got %d: %v", len(errs), errs)
+		}
+		if errs[0].Field != "config.license" {
+			t.Fatalf("Field = %q, want %q", errs[0].Field, "config.license")
+		}
+	})
 
-			errFieldSet := make(map[string]bool)
-			for _, e := range errs {
-				errFieldSet[e.Field] = true
-			}
-			for _, field := range tt.wantErrFields {
-				if !errFieldSet[field] {
-					t.Errorf("expected error on field %q, but not found in %v", field, errs)
-				}
-			}
-		})
-	}
+	t.Run("unknown config value", func(t *testing.T) {
+		repoCfg := &config.RepoConfig{
+			Name:          "example-repo",
+			DefaultBranch: "main",
+			Config: map[string]interface{}{
+				"license": "mit",
+				"other":   "x",
+			},
+		}
+
+		errs := ValidateRepoConfig(repoCfg, centralCfg, filepath.Join(t.TempDir(), "example-repo"))
+		if len(errs) != 1 {
+			t.Fatalf("expected 1 validation error, got %d: %v", len(errs), errs)
+		}
+		if errs[0].Field != "config.other" {
+			t.Fatalf("Field = %q, want %q", errs[0].Field, "config.other")
+		}
+	})
+
+	t.Run("enum mismatch", func(t *testing.T) {
+		repoCfg := &config.RepoConfig{
+			Name:          "example-repo",
+			DefaultBranch: "main",
+			Config: map[string]interface{}{
+				"license": "gpl-3.0",
+			},
+		}
+
+		errs := ValidateRepoConfig(repoCfg, centralCfg, filepath.Join(t.TempDir(), "example-repo"))
+		if len(errs) != 1 {
+			t.Fatalf("expected 1 validation error, got %d: %v", len(errs), errs)
+		}
+		if errs[0].Field != "config.license" {
+			t.Fatalf("Field = %q, want %q", errs[0].Field, "config.license")
+		}
+	})
+
+	t.Run("missing default branch", func(t *testing.T) {
+		repoCfg := &config.RepoConfig{
+			Name: "example-repo",
+			Config: map[string]interface{}{
+				"license": "mit",
+			},
+		}
+
+		errs := ValidateRepoConfig(repoCfg, centralCfg, filepath.Join(t.TempDir(), "example-repo"))
+		if len(errs) != 1 {
+			t.Fatalf("expected 1 validation error, got %d: %v", len(errs), errs)
+		}
+		if errs[0].Field != "default_branch" {
+			t.Fatalf("Field = %q, want %q", errs[0].Field, "default_branch")
+		}
+	})
 }

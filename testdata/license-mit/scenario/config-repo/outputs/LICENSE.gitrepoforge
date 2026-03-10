@@ -1,0 +1,5 @@
+templates:
+  - condition: license == "mit"
+    template: licenses/mit.tmpl
+  - condition: license == "apache-2.0"
+    template: licenses/apache-2.0.tmpl

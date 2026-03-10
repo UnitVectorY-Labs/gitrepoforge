@@ -1,0 +1,5 @@
+name: gitrepoforge
+default_branch: main
+config:
+  license: MIT
+  language: go

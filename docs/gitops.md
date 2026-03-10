@@ -46,7 +46,7 @@ If `create_pr` is `true` in the root config **and** the remote branch did not al
 gh pr create --head {branch} --base {default_branch} --title {title} --body {body}
 ```
 
-- The base branch is the `default_branch` from the root config.
+- The base branch is the `default_branch` from the repo's `.gitrepoforge` file.
 - PRs are only created for new remote branches to avoid duplicate PRs on subsequent runs.
 
 ### Prerequisites

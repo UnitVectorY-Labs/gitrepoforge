@@ -36,59 +36,58 @@ func ValidateRepoConfig(repoCfg *config.RepoConfig, centralCfg *config.CentralCo
 			Message: fmt.Sprintf("name %q does not match folder name %q", repoCfg.Name, folderName),
 		})
 	}
-
-	// Build allowed input names from central config
-	allowedInputs := make(map[string]*config.InputDef)
-	for i := range centralCfg.Inputs {
-		allowedInputs[centralCfg.Inputs[i].Name] = &centralCfg.Inputs[i]
+	if repoCfg.DefaultBranch == "" {
+		errors = append(errors, ValidationError{Field: "default_branch", Message: "default_branch is required"})
 	}
 
-	// Check for required inputs
-	for _, inputDef := range centralCfg.Inputs {
-		if inputDef.Required {
-			if repoCfg.Inputs == nil {
-				errors = append(errors, ValidationError{
-					Field:   fmt.Sprintf("inputs.%s", inputDef.Name),
-					Message: "required input is missing",
-				})
-			} else if _, ok := repoCfg.Inputs[inputDef.Name]; !ok {
-				errors = append(errors, ValidationError{
-					Field:   fmt.Sprintf("inputs.%s", inputDef.Name),
-					Message: "required input is missing",
-				})
-			}
-		}
+	allowedConfig := make(map[string]*config.ConfigDefinition)
+	for i := range centralCfg.Definitions {
+		allowedConfig[centralCfg.Definitions[i].Name] = &centralCfg.Definitions[i]
 	}
 
-	// Check for unknown inputs (strict no-extra-properties)
-	if repoCfg.Inputs != nil {
-		for key := range repoCfg.Inputs {
-			if _, ok := allowedInputs[key]; !ok {
+	for _, def := range centralCfg.Definitions {
+		if def.Required {
+			if repoCfg.Config == nil {
 				errors = append(errors, ValidationError{
-					Field:   fmt.Sprintf("inputs.%s", key),
-					Message: "unknown input",
+					Field:   fmt.Sprintf("config.%s", def.Name),
+					Message: "required config value is missing",
+				})
+			} else if _, ok := repoCfg.Config[def.Name]; !ok {
+				errors = append(errors, ValidationError{
+					Field:   fmt.Sprintf("config.%s", def.Name),
+					Message: "required config value is missing",
 				})
 			}
 		}
 	}
 
-	// Validate input values
-	if repoCfg.Inputs != nil {
-		for key, val := range repoCfg.Inputs {
-			def, ok := allowedInputs[key]
+	if repoCfg.Config != nil {
+		for key := range repoCfg.Config {
+			if _, ok := allowedConfig[key]; !ok {
+				errors = append(errors, ValidationError{
+					Field:   fmt.Sprintf("config.%s", key),
+					Message: "unknown config value",
+				})
+			}
+		}
+	}
+
+	if repoCfg.Config != nil {
+		for key, val := range repoCfg.Config {
+			def, ok := allowedConfig[key]
 			if !ok {
-				continue // already reported as unknown
+				continue
 			}
-			errors = append(errors, validateInputValue(key, val, def)...)
+			errors = append(errors, validateConfigValue(key, val, def)...)
 		}
 	}
 
 	return errors
 }
 
-func validateInputValue(name string, val interface{}, def *config.InputDef) []ValidationError {
+func validateConfigValue(name string, val interface{}, def *config.ConfigDefinition) []ValidationError {
 	var errors []ValidationError
-	field := fmt.Sprintf("inputs.%s", name)
+	field := fmt.Sprintf("config.%s", name)
 
 	switch def.Type {
 	case "string":
@@ -127,6 +126,8 @@ func validateInputValue(name string, val interface{}, def *config.InputDef) []Va
 		if _, ok := val.([]interface{}); !ok {
 			errors = append(errors, ValidationError{Field: field, Message: "expected list value"})
 		}
+	default:
+		errors = append(errors, ValidationError{Field: field, Message: fmt.Sprintf("unsupported config type %q", def.Type)})
 	}
 
 	return errors

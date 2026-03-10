@@ -11,11 +11,10 @@ import (
 // RootConfig represents the root config dotfile (.gitrepoforge-config)
 // that lives in the checkout root (workspace directory).
 type RootConfig struct {
-	ConfigRepo    string   `yaml:"config_repo"`
-	DefaultBranch string   `yaml:"default_branch"`
-	Excludes      []string `yaml:"excludes"`
-	BranchPrefix  string   `yaml:"branch_prefix"`
-	CreatePR      bool     `yaml:"create_pr"`
+	ConfigRepo   string   `yaml:"config_repo"`
+	Excludes     []string `yaml:"excludes"`
+	BranchPrefix string   `yaml:"branch_prefix"`
+	CreatePR     bool     `yaml:"create_pr"`
 }
 
 const RootConfigFileName = ".gitrepoforge-config"
@@ -32,9 +31,6 @@ func LoadRootConfig(workspaceDir string) (*RootConfig, error) {
 	}
 	if cfg.ConfigRepo == "" {
 		return nil, fmt.Errorf("root config %s: config_repo is required", path)
-	}
-	if cfg.DefaultBranch == "" {
-		return nil, fmt.Errorf("root config %s: default_branch is required", path)
 	}
 	if cfg.BranchPrefix == "" {
 		cfg.BranchPrefix = "gitrepoforge/"

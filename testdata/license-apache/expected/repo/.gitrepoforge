@@ -1,0 +1,4 @@
+name: repo
+default_branch: main
+config:
+  license: apache-2.0

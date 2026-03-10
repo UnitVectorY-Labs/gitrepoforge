@@ -1,0 +1,4 @@
+name: repo
+default_branch: main
+config:
+  license: mit

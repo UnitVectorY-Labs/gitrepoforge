@@ -1,0 +1,3 @@
+templates:
+  - condition: license == "mit"
+    template: licenses/mit.tmpl

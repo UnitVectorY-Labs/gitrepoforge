@@ -11,16 +11,17 @@ import (
 )
 
 // CentralConfig represents the desired-state configuration repository.
-// Inputs are loaded from individual files under inputs/.
+// Config definitions are loaded from individual files under config/.
 // File rules are loaded from individual files under outputs/.
 type CentralConfig struct {
-	Inputs []InputDef
-	Files  []FileRule
+	RootDir     string
+	Definitions []ConfigDefinition
+	Files       []FileRule
 }
 
-// InputDef defines a valid input for per-repo configs.
-// Each input is stored as its own file: inputs/<name>.yaml
-type InputDef struct {
+// ConfigDefinition defines a valid config value for per-repo configs.
+// Each definition is stored as its own file: config/<name>.yaml
+type ConfigDefinition struct {
 	Name        string   `yaml:"-"`
 	Type        string   `yaml:"type"`
 	Required    bool     `yaml:"required"`
@@ -32,38 +33,42 @@ type InputDef struct {
 // FileRule defines how an output file is managed.
 // Each rule is stored as its own file: outputs/<path>.gitrepoforge
 type FileRule struct {
-	Path      string      `yaml:"-"`
-	Mode      string      `yaml:"mode"`
-	Condition string      `yaml:"condition"`
-	Template  string      `yaml:"template"`
-	Blocks    []BlockRule `yaml:"blocks"`
+	Path      string        `yaml:"-"`
+	Mode      string        `yaml:"mode"`
+	Templates []TemplateRef `yaml:"templates"`
 }
 
-// BlockRule defines a managed block within a partially managed file.
-type BlockRule struct {
-	BeginMarker string `yaml:"begin_marker"`
-	EndMarker   string `yaml:"end_marker"`
-	Template    string `yaml:"template"`
+// TemplateRef selects a template file from templates/.
+type TemplateRef struct {
+	Condition    string `yaml:"condition"`
+	Template     string `yaml:"template"`
+	ResolvedPath string `yaml:"-"`
 }
 
 const (
-	InputsDir       = "inputs"
-	OutputsDir      = "outputs"
+	ConfigDir        = "config"
+	OutputsDir       = "outputs"
+	TemplatesDir     = "templates"
 	OutputFileSuffix = ".gitrepoforge"
 )
 
 // LoadCentralConfig loads the central config from the config repo by scanning
-// the inputs/ and outputs/ directories for individual definition files.
+// the config/ and outputs/ directories for individual definition files.
 func LoadCentralConfig(configRepoPath string) (*CentralConfig, error) {
-	cfg := &CentralConfig{}
-
-	inputs, err := loadInputDefs(filepath.Join(configRepoPath, InputsDir))
-	if err != nil {
-		return nil, fmt.Errorf("failed to load inputs: %w", err)
+	cfg := &CentralConfig{
+		RootDir: configRepoPath,
 	}
-	cfg.Inputs = inputs
 
-	files, err := loadOutputRules(filepath.Join(configRepoPath, OutputsDir))
+	definitions, err := loadConfigDefinitions(filepath.Join(configRepoPath, ConfigDir))
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config definitions: %w", err)
+	}
+	cfg.Definitions = definitions
+
+	files, err := loadOutputRules(
+		filepath.Join(configRepoPath, OutputsDir),
+		filepath.Join(configRepoPath, TemplatesDir),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load outputs: %w", err)
 	}
@@ -72,53 +77,52 @@ func LoadCentralConfig(configRepoPath string) (*CentralConfig, error) {
 	return cfg, nil
 }
 
-// loadInputDefs scans the inputs/ directory for YAML files.
-// Each file defines one input; the filename (without .yaml) is the input name.
-func loadInputDefs(inputsDir string) ([]InputDef, error) {
-	if _, err := os.Stat(inputsDir); os.IsNotExist(err) {
-		return nil, nil // no inputs directory is valid (empty inputs)
+// loadConfigDefinitions scans the config/ directory for YAML files.
+// Each file defines one config value; the filename (without .yaml) is the key.
+func loadConfigDefinitions(configDir string) ([]ConfigDefinition, error) {
+	if _, err := os.Stat(configDir); os.IsNotExist(err) {
+		return nil, nil
 	}
 
-	entries, err := os.ReadDir(inputsDir)
+	entries, err := os.ReadDir(configDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read inputs directory %s: %w", inputsDir, err)
+		return nil, fmt.Errorf("failed to read config directory %s: %w", configDir, err)
 	}
 
-	var inputs []InputDef
+	var definitions []ConfigDefinition
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
 			continue
 		}
 		name := strings.TrimSuffix(entry.Name(), ".yaml")
-		path := filepath.Join(inputsDir, entry.Name())
+		path := filepath.Join(configDir, entry.Name())
 
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read input file %s: %w", path, err)
+			return nil, fmt.Errorf("failed to read config file %s: %w", path, err)
 		}
 
-		var def InputDef
+		var def ConfigDefinition
 		if err := yaml.Unmarshal(data, &def); err != nil {
-			return nil, fmt.Errorf("failed to parse input file %s: %w", path, err)
+			return nil, fmt.Errorf("failed to parse config file %s: %w", path, err)
 		}
 		def.Name = name
-		inputs = append(inputs, def)
+		definitions = append(definitions, def)
 	}
 
-	// Sort by name for deterministic ordering
-	sort.Slice(inputs, func(i, j int) bool {
-		return inputs[i].Name < inputs[j].Name
+	sort.Slice(definitions, func(i, j int) bool {
+		return definitions[i].Name < definitions[j].Name
 	})
 
-	return inputs, nil
+	return definitions, nil
 }
 
 // loadOutputRules walks the outputs/ directory tree for .gitrepoforge files.
 // Each file defines one output rule; the path relative to outputs/ minus the
 // .gitrepoforge suffix is the target file path.
-func loadOutputRules(outputsDir string) ([]FileRule, error) {
+func loadOutputRules(outputsDir, templatesDir string) ([]FileRule, error) {
 	if _, err := os.Stat(outputsDir); os.IsNotExist(err) {
-		return nil, nil // no outputs directory is valid (empty rules)
+		return nil, nil
 	}
 
 	var rules []FileRule
@@ -137,7 +141,6 @@ func loadOutputRules(outputsDir string) ([]FileRule, error) {
 		if err != nil {
 			return fmt.Errorf("failed to compute relative path for %s: %w", path, err)
 		}
-		// Strip the .gitrepoforge suffix to get the target file path
 		targetPath := strings.TrimSuffix(relPath, OutputFileSuffix)
 
 		data, err := os.ReadFile(path)
@@ -151,7 +154,14 @@ func loadOutputRules(outputsDir string) ([]FileRule, error) {
 		}
 		rule.Path = targetPath
 		if rule.Mode == "" {
-			rule.Mode = "create" // default mode
+			rule.Mode = "create"
+		}
+		for i := range rule.Templates {
+			resolved, err := resolveTemplatePath(templatesDir, rule.Templates[i].Template)
+			if err != nil {
+				return fmt.Errorf("output file %s: %w", path, err)
+			}
+			rule.Templates[i].ResolvedPath = resolved
 		}
 		rules = append(rules, rule)
 		return nil
@@ -160,10 +170,25 @@ func loadOutputRules(outputsDir string) ([]FileRule, error) {
 		return nil, fmt.Errorf("failed to walk outputs directory %s: %w", outputsDir, err)
 	}
 
-	// Sort by path for deterministic ordering
 	sort.Slice(rules, func(i, j int) bool {
 		return rules[i].Path < rules[j].Path
 	})
 
 	return rules, nil
+}
+
+func resolveTemplatePath(templatesDir, ref string) (string, error) {
+	if ref == "" {
+		return "", fmt.Errorf("template is required")
+	}
+	if filepath.IsAbs(ref) {
+		return "", fmt.Errorf("template %q must be relative to %s", ref, TemplatesDir)
+	}
+
+	cleanRef := filepath.Clean(ref)
+	if cleanRef == "." || strings.HasPrefix(cleanRef, "..") {
+		return "", fmt.Errorf("template %q must stay within %s", ref, TemplatesDir)
+	}
+
+	return filepath.Join(templatesDir, cleanRef), nil
 }

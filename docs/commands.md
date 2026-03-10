@@ -19,12 +19,12 @@ gitrepoforge validate [flags]
 
 ### Behavior
 
-1. Loads the root config (`.gitrepoforge-config`) and central config (`inputs/` + `outputs/` directories).
+1. Loads the root config (`.gitrepoforge-config`) and config repo (`config/`, `outputs/`, `templates/`).
 2. Discovers Git repos in the workspace (or targets the single `--repo`).
 3. For each repo:
    - If no `.gitrepoforge` file exists, the repo is **skipped**.
-   - Validates the per-repo config against the central input schema.
-   - Renders templates and compares to the current file state.
+   - Validates the per-repo config, including `default_branch`, against the shared config schema.
+   - Selects template files, renders them, and compares them to the current file state.
 4. Reports each repo's status.
 
 ### Statuses
@@ -33,7 +33,7 @@ gitrepoforge validate [flags]
 |--------|---------|
 | `clean` | Repo is compliant — no changes needed. |
 | `skipped` | Repo has no `.gitrepoforge` file. |
-| `invalid` | Validation errors (missing inputs, type mismatches, etc.). |
+| `invalid` | Validation errors (missing config values, type mismatches, etc.). |
 | `drift` | Findings detected — files differ from desired state. |
 
 ## apply
@@ -56,7 +56,7 @@ gitrepoforge apply [flags]
 1. Same discovery and validation as `validate`.
 2. For each repo with findings:
    - Creates branch `{branch_prefix}update` (e.g. `gitrepoforge/update`).
-   - Applies file changes (create, update, delete, block replace).
+   - Applies file changes (`create`, `update`, `delete`).
    - Stages all changes with `git add -A`.
    - Commits with message `"gitrepoforge: apply desired state"`.
    - Pushes to `origin`.
@@ -139,4 +139,3 @@ Returns a structured report:
 | `create` | File should exist but is missing. |
 | `update` | File exists but content differs from desired state. |
 | `delete` | File should not exist but is present. |
-| `block_replace` | A managed block within a file differs from desired content. |

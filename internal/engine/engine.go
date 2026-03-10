@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/template"
 
@@ -20,32 +21,27 @@ type Finding struct {
 	Actual    string `json:"actual,omitempty"`
 }
 
-// TemplateData is the data passed to templates for rendering.
+// TemplateData is the data passed to template files for rendering.
 type TemplateData struct {
 	Name   string
-	Inputs map[string]interface{}
+	Config map[string]interface{}
 }
 
 // ComputeFindings computes the compliance findings for a repo.
-// It returns the list of findings (differences between desired and actual state).
 func ComputeFindings(repoCfg *config.RepoConfig, centralCfg *config.CentralConfig, repoPath string) ([]Finding, error) {
 	var findings []Finding
 
 	data := TemplateData{
 		Name:   repoCfg.Name,
-		Inputs: repoCfg.Inputs,
+		Config: repoCfg.Config,
 	}
 
 	for _, rule := range centralCfg.Files {
-		if !evaluateCondition(rule.Condition, data) {
-			continue
-		}
-
-		ruleFinding, err := evaluateFileRule(rule, data, repoPath)
+		ruleFindings, err := evaluateFileRule(rule, data, repoPath)
 		if err != nil {
 			return nil, fmt.Errorf("error evaluating rule for %s: %w", rule.Path, err)
 		}
-		findings = append(findings, ruleFinding...)
+		findings = append(findings, ruleFindings...)
 	}
 
 	return findings, nil
@@ -68,10 +64,6 @@ func ApplyFindings(findings []Finding, repoPath string) error {
 			if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
 				return fmt.Errorf("failed to delete file %s: %w", filePath, err)
 			}
-		case "block_replace":
-			if err := os.WriteFile(filePath, []byte(f.Expected), 0644); err != nil {
-				return fmt.Errorf("failed to write file %s: %w", filePath, err)
-			}
 		}
 	}
 	return nil
@@ -79,23 +71,22 @@ func ApplyFindings(findings []Finding, repoPath string) error {
 
 func evaluateFileRule(rule config.FileRule, data TemplateData, repoPath string) ([]Finding, error) {
 	switch rule.Mode {
-	case "create":
-		return evaluateCreateRule(rule, data, repoPath)
 	case "delete":
 		return evaluateDeleteRule(rule, repoPath)
-	case "partial":
-		return evaluatePartialRule(rule, data, repoPath)
-	default:
+	case "create", "":
 		return evaluateCreateRule(rule, data, repoPath)
+	default:
+		return nil, fmt.Errorf("unsupported mode %q", rule.Mode)
 	}
 }
 
 func evaluateCreateRule(rule config.FileRule, data TemplateData, repoPath string) ([]Finding, error) {
-	if rule.Template == "" {
-		return nil, fmt.Errorf("output rule for %s has no template", rule.Path)
+	selected, err := selectTemplate(rule, data)
+	if err != nil {
+		return nil, err
 	}
 
-	expected, err := renderTemplateString(rule.Template, data)
+	expected, err := renderTemplateFile(selected.ResolvedPath, data)
 	if err != nil {
 		return nil, err
 	}
@@ -139,165 +130,138 @@ func evaluateDeleteRule(rule config.FileRule, repoPath string) ([]Finding, error
 	return nil, nil
 }
 
-func evaluatePartialRule(rule config.FileRule, data TemplateData, repoPath string) ([]Finding, error) {
-	filePath := filepath.Join(repoPath, rule.Path)
-	actual, err := os.ReadFile(filePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// For partial rules, if the file doesn't exist, we create it with just the managed blocks
-			content, err := renderManagedBlocks(rule.Blocks, data)
-			if err != nil {
-				return nil, err
-			}
-			return []Finding{{
-				FilePath:  rule.Path,
-				Operation: "create",
-				Message:   "file does not exist; managed blocks need to be created",
-				Expected:  content,
-			}}, nil
-		}
-		return nil, fmt.Errorf("failed to read %s: %w", filePath, err)
+func selectTemplate(rule config.FileRule, data TemplateData) (config.TemplateRef, error) {
+	if len(rule.Templates) == 0 {
+		return config.TemplateRef{}, fmt.Errorf("output rule has no templates")
 	}
 
-	currentContent := string(actual)
-	expectedContent := currentContent
-
-	for _, block := range rule.Blocks {
-		blockContent, err := renderBlockContent(block, data)
+	for _, candidate := range rule.Templates {
+		matches, err := EvaluateCondition(candidate.Condition, data.Config)
 		if err != nil {
-			return nil, err
+			return config.TemplateRef{}, fmt.Errorf("invalid condition %q: %w", candidate.Condition, err)
 		}
-		expectedContent = replaceBlock(expectedContent, block.BeginMarker, block.EndMarker, blockContent)
+		if matches {
+			return candidate, nil
+		}
 	}
 
-	if currentContent != expectedContent {
-		return []Finding{{
-			FilePath:  rule.Path,
-			Operation: "block_replace",
-			Message:   "managed blocks differ from expected",
-			Expected:  expectedContent,
-			Actual:    currentContent,
-		}}, nil
-	}
-
-	return nil, nil
+	return config.TemplateRef{}, fmt.Errorf("no template matched")
 }
 
-func renderTemplateString(tmplStr string, data TemplateData) (string, error) {
+func renderTemplateFile(path string, data TemplateData) (string, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to read template %s: %w", path, err)
+	}
+
 	funcMap := template.FuncMap{
-		"contains": func(list []interface{}, item string) bool {
-			for _, v := range list {
-				if fmt.Sprintf("%v", v) == item {
-					return true
-				}
-			}
-			return false
-		},
-		"join": func(list []interface{}, sep string) string {
-			var strs []string
-			for _, v := range list {
-				strs = append(strs, fmt.Sprintf("%v", v))
-			}
-			return strings.Join(strs, sep)
-		},
-		"getInput": func(inputs map[string]interface{}, key string) interface{} {
-			if inputs == nil {
+		"getConfig": func(values map[string]interface{}, key string) interface{} {
+			if values == nil {
 				return nil
 			}
-			return inputs[key]
+			return values[key]
 		},
 	}
 
-	tmpl, err := template.New("content").Funcs(funcMap).Parse(tmplStr)
+	tmpl, err := template.New(filepath.Base(path)).Funcs(funcMap).Parse(string(content))
 	if err != nil {
-		return "", fmt.Errorf("failed to parse template: %w", err)
+		return "", fmt.Errorf("failed to parse template %s: %w", path, err)
 	}
+
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("failed to execute template: %w", err)
+		return "", fmt.Errorf("failed to execute template %s: %w", path, err)
 	}
+
 	return buf.String(), nil
 }
 
-func renderManagedBlocks(blocks []config.BlockRule, data TemplateData) (string, error) {
-	var parts []string
-	for _, block := range blocks {
-		content, err := renderBlockContent(block, data)
-		if err != nil {
-			return "", err
-		}
-		parts = append(parts, block.BeginMarker+"\n"+content+"\n"+block.EndMarker)
-	}
-	return strings.Join(parts, "\n"), nil
-}
-
-func renderBlockContent(block config.BlockRule, data TemplateData) (string, error) {
-	if block.Template != "" {
-		return renderTemplateString(block.Template, data)
-	}
-	return "", nil
-}
-
-func replaceBlock(content, beginMarker, endMarker, newBlock string) string {
-	beginIdx := strings.Index(content, beginMarker)
-	endIdx := strings.Index(content, endMarker)
-
-	if beginIdx == -1 || endIdx == -1 || endIdx <= beginIdx {
-		// Markers not found: append the block at the end
-		return content + "\n" + beginMarker + "\n" + newBlock + "\n" + endMarker + "\n"
-	}
-
-	// Replace content between markers (inclusive of markers)
-	return content[:beginIdx] + beginMarker + "\n" + newBlock + "\n" + endMarker + content[endIdx+len(endMarker):]
-}
-
-func evaluateCondition(condition string, data TemplateData) bool {
+// EvaluateCondition checks whether a template selector condition matches the
+// current repo config. Empty conditions always match.
+func EvaluateCondition(condition string, values map[string]interface{}) (bool, error) {
+	condition = strings.TrimSpace(condition)
 	if condition == "" {
-		return true
+		return true, nil
 	}
 
-	// Simple condition evaluation: "input_name == value"
-	parts := strings.SplitN(condition, "==", 2)
-	if len(parts) == 2 {
+	if strings.HasPrefix(condition, "!") {
+		result, err := evaluateBooleanKey(strings.TrimSpace(condition[1:]), values)
+		if err != nil {
+			return false, err
+		}
+		return !result, nil
+	}
+
+	if strings.Contains(condition, "!=") {
+		parts := strings.SplitN(condition, "!=", 2)
 		key := strings.TrimSpace(parts[0])
-		expected := strings.TrimSpace(parts[1])
-		expected = strings.Trim(expected, "\"'")
-
-		if data.Inputs != nil {
-			if val, ok := data.Inputs[key]; ok {
-				return fmt.Sprintf("%v", val) == expected
-			}
+		if !isValidConditionKey(key) {
+			return false, fmt.Errorf("invalid condition key %q", key)
 		}
-		return false
+		expected := parseConditionValue(parts[1])
+		actual, ok := lookupConfigValue(key, values)
+		if !ok {
+			return true, nil
+		}
+		return fmt.Sprintf("%v", actual) != expected, nil
 	}
 
-	// Simple condition: "input_name != value"
-	parts = strings.SplitN(condition, "!=", 2)
-	if len(parts) == 2 {
+	if strings.Contains(condition, "==") {
+		parts := strings.SplitN(condition, "==", 2)
 		key := strings.TrimSpace(parts[0])
-		expected := strings.TrimSpace(parts[1])
-		expected = strings.Trim(expected, "\"'")
-
-		if data.Inputs != nil {
-			if val, ok := data.Inputs[key]; ok {
-				return fmt.Sprintf("%v", val) != expected
-			}
+		if !isValidConditionKey(key) {
+			return false, fmt.Errorf("invalid condition key %q", key)
 		}
-		return true
+		expected := parseConditionValue(parts[1])
+		actual, ok := lookupConfigValue(key, values)
+		if !ok {
+			return false, nil
+		}
+		return fmt.Sprintf("%v", actual) == expected, nil
 	}
 
-	// Boolean input check: "input_name"
-	if data.Inputs != nil {
-		if val, ok := data.Inputs[condition]; ok {
-			switch v := val.(type) {
-			case bool:
-				return v
-			case string:
-				return v != "" && v != "false"
-			default:
-				return true
-			}
+	return evaluateBooleanKey(condition, values)
+}
+
+func evaluateBooleanKey(key string, values map[string]interface{}) (bool, error) {
+	key = strings.TrimSpace(key)
+	if !isValidConditionKey(key) {
+		return false, fmt.Errorf("invalid boolean condition %q", key)
+	}
+
+	actual, ok := lookupConfigValue(key, values)
+	if !ok {
+		return false, nil
+	}
+
+	boolean, ok := actual.(bool)
+	if !ok {
+		return false, fmt.Errorf("bare condition %q requires a boolean config value", key)
+	}
+
+	return boolean, nil
+}
+
+func lookupConfigValue(key string, values map[string]interface{}) (interface{}, bool) {
+	if values == nil {
+		return nil, false
+	}
+	value, ok := values[key]
+	return value, ok
+}
+
+func parseConditionValue(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if len(raw) >= 2 {
+		if (raw[0] == '"' && raw[len(raw)-1] == '"') || (raw[0] == '\'' && raw[len(raw)-1] == '\'') {
+			return raw[1 : len(raw)-1]
 		}
 	}
-	return false
+	return raw
+}
+
+var conditionKeyPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
+
+func isValidConditionKey(key string) bool {
+	return conditionKeyPattern.MatchString(key)
 }

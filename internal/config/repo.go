@@ -11,10 +11,10 @@ import (
 const RepoConfigFileName = ".gitrepoforge"
 
 // RepoConfig represents the per-repo config dotfile (.gitrepoforge).
-// The raw YAML is stored for JSON Schema validation, plus parsed inputs.
 type RepoConfig struct {
-	Name   string                 `yaml:"name"`
-	Inputs map[string]interface{} `yaml:"inputs"`
+	Name          string                 `yaml:"name"`
+	DefaultBranch string                 `yaml:"default_branch"`
+	Config        map[string]interface{} `yaml:"config"`
 }
 
 func LoadRepoConfig(repoPath string) (*RepoConfig, error) {

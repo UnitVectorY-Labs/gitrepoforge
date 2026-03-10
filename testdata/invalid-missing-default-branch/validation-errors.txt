@@ -1,0 +1,1 @@
+default_branch: default_branch is required

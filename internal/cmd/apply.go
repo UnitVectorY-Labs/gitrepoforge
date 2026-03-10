@@ -146,7 +146,7 @@ func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg
 	branchName := rootCfg.BranchPrefix + "update"
 
 	// Checkout default branch first
-	if err := gitops.CheckoutBranch(repoPath, rootCfg.DefaultBranch); err != nil {
+	if err := gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch); err != nil {
 		return output.RepoResult{
 			Name:             repoName,
 			Status:           "failed",
@@ -176,7 +176,7 @@ func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg
 	// Apply changes
 	if err := engine.ApplyFindings(findings, repoPath); err != nil {
 		// Attempt to return to default branch
-		gitops.CheckoutBranch(repoPath, rootCfg.DefaultBranch)
+		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
 		return output.RepoResult{
 			Name:             repoName,
 			Status:           "failed",
@@ -186,7 +186,7 @@ func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg
 
 	// Stage and commit
 	if err := gitops.AddAll(repoPath); err != nil {
-		gitops.CheckoutBranch(repoPath, rootCfg.DefaultBranch)
+		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
 		return output.RepoResult{
 			Name:             repoName,
 			Status:           "failed",
@@ -196,7 +196,7 @@ func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg
 
 	hasChanges, err := gitops.HasChanges(repoPath)
 	if err != nil {
-		gitops.CheckoutBranch(repoPath, rootCfg.DefaultBranch)
+		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
 		return output.RepoResult{
 			Name:             repoName,
 			Status:           "failed",
@@ -205,7 +205,7 @@ func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg
 	}
 
 	if !hasChanges {
-		gitops.CheckoutBranch(repoPath, rootCfg.DefaultBranch)
+		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
 		return output.RepoResult{
 			Name:   repoName,
 			Status: "clean",
@@ -213,7 +213,7 @@ func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg
 	}
 
 	if err := gitops.Commit(repoPath, "gitrepoforge: apply desired state"); err != nil {
-		gitops.CheckoutBranch(repoPath, rootCfg.DefaultBranch)
+		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
 		return output.RepoResult{
 			Name:             repoName,
 			Status:           "failed",
@@ -223,7 +223,7 @@ func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg
 
 	// Push
 	if err := gitops.Push(repoPath, branchName); err != nil {
-		gitops.CheckoutBranch(repoPath, rootCfg.DefaultBranch)
+		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
 		return output.RepoResult{
 			Name:             repoName,
 			Status:           "failed",
@@ -236,7 +236,7 @@ func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg
 		if remoteBranchExists {
 			output.Warning(fmt.Sprintf("%s: remote branch %s already exists; skipping PR creation", repoName, branchName))
 		} else {
-			err := gitops.CreatePR(repoPath, branchName, rootCfg.DefaultBranch,
+			err := gitops.CreatePR(repoPath, branchName, repoCfg.DefaultBranch,
 				"gitrepoforge: apply desired state",
 				"Automated changes applied by gitrepoforge.")
 			if err != nil {
@@ -246,7 +246,7 @@ func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg
 	}
 
 	// Return to default branch
-	gitops.CheckoutBranch(repoPath, rootCfg.DefaultBranch)
+	gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
 
 	var findingOutputs []output.FindingOutput
 	for _, f := range findings {

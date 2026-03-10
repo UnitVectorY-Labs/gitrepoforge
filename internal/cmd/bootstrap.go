@@ -133,7 +133,7 @@ func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centra
 	branchName := rootCfg.BranchPrefix + "bootstrap"
 
 	// Checkout default branch first
-	if err := gitops.CheckoutBranch(repoPath, rootCfg.DefaultBranch); err != nil {
+	if err := gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch); err != nil {
 		return output.RepoResult{
 			Name:             repoName,
 			Status:           "failed",
@@ -152,7 +152,7 @@ func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centra
 
 	// Apply changes
 	if err := engine.ApplyFindings(findings, repoPath); err != nil {
-		gitops.CheckoutBranch(repoPath, rootCfg.DefaultBranch)
+		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
 		return output.RepoResult{
 			Name:             repoName,
 			Status:           "failed",
@@ -162,7 +162,7 @@ func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centra
 
 	// Stage and commit
 	if err := gitops.AddAll(repoPath); err != nil {
-		gitops.CheckoutBranch(repoPath, rootCfg.DefaultBranch)
+		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
 		return output.RepoResult{
 			Name:             repoName,
 			Status:           "failed",
@@ -172,7 +172,7 @@ func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centra
 
 	hasChanges, err := gitops.HasChanges(repoPath)
 	if err != nil {
-		gitops.CheckoutBranch(repoPath, rootCfg.DefaultBranch)
+		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
 		return output.RepoResult{
 			Name:             repoName,
 			Status:           "failed",
@@ -181,7 +181,7 @@ func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centra
 	}
 
 	if !hasChanges {
-		gitops.CheckoutBranch(repoPath, rootCfg.DefaultBranch)
+		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
 		return output.RepoResult{
 			Name:   repoName,
 			Status: "clean",
@@ -189,7 +189,7 @@ func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centra
 	}
 
 	if err := gitops.Commit(repoPath, "gitrepoforge: bootstrap repo"); err != nil {
-		gitops.CheckoutBranch(repoPath, rootCfg.DefaultBranch)
+		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
 		return output.RepoResult{
 			Name:             repoName,
 			Status:           "failed",
@@ -199,7 +199,7 @@ func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centra
 
 	// Push
 	if err := gitops.Push(repoPath, branchName); err != nil {
-		gitops.CheckoutBranch(repoPath, rootCfg.DefaultBranch)
+		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
 		return output.RepoResult{
 			Name:             repoName,
 			Status:           "failed",
@@ -209,7 +209,7 @@ func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centra
 
 	// Create PR if configured
 	if rootCfg.CreatePR {
-		err := gitops.CreatePR(repoPath, branchName, rootCfg.DefaultBranch,
+		err := gitops.CreatePR(repoPath, branchName, repoCfg.DefaultBranch,
 			"gitrepoforge: bootstrap repo",
 			"Automated bootstrap by gitrepoforge.")
 		if err != nil {
@@ -218,7 +218,7 @@ func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centra
 	}
 
 	// Return to default branch
-	gitops.CheckoutBranch(repoPath, rootCfg.DefaultBranch)
+	gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
 
 	var findingOutputs []output.FindingOutput
 	for _, f := range findings {
