@@ -31,8 +31,8 @@ func TestLoadRootConfig(t *testing.T) {
 	if cfg.ConfigRepo != "config-repo" {
 		t.Fatalf("ConfigRepo = %q, want %q", cfg.ConfigRepo, "config-repo")
 	}
-	if cfg.BranchPrefix != "gitrepoforge/" {
-		t.Fatalf("BranchPrefix = %q, want default %q", cfg.BranchPrefix, "gitrepoforge/")
+	if cfg.Git.BranchPrefix != "gitrepoforge/" {
+		t.Fatalf("Git.BranchPrefix = %q, want default %q", cfg.Git.BranchPrefix, "gitrepoforge/")
 	}
 }
 

@@ -130,7 +130,7 @@ func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centra
 	}
 
 	// Bootstrap uses a distinct branch name
-	branchName := rootCfg.BranchPrefix + "bootstrap"
+	branchName := rootCfg.Git.BranchPrefix + "bootstrap"
 
 	// Checkout default branch first
 	if err := gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch); err != nil {
@@ -208,10 +208,10 @@ func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centra
 	}
 
 	// Create PR if configured
-	if rootCfg.CreatePR {
+	if rootCfg.Git.PullRequest == config.PullRequestGitHubCLI {
 		err := gitops.CreatePR(repoPath, branchName, repoCfg.DefaultBranch,
-			"gitrepoforge: bootstrap repo",
-			"Automated bootstrap by gitrepoforge.")
+			rootCfg.Git.BootstrapPRTitle,
+			rootCfg.Git.BootstrapPRBody)
 		if err != nil {
 			output.Warning(fmt.Sprintf("%s: PR creation failed: %v", repoName, err))
 		}

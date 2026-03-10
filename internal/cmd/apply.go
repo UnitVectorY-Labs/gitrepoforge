@@ -143,7 +143,7 @@ func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg
 	}
 
 	// Create branch, apply changes, commit, push
-	branchName := rootCfg.BranchPrefix + "update"
+	branchName := rootCfg.Git.BranchPrefix + "update"
 
 	// Checkout default branch first
 	if err := gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch); err != nil {
@@ -232,13 +232,13 @@ func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg
 	}
 
 	// Create PR if configured and remote branch didn't already exist
-	if rootCfg.CreatePR {
+	if rootCfg.Git.PullRequest == config.PullRequestGitHubCLI {
 		if remoteBranchExists {
 			output.Warning(fmt.Sprintf("%s: remote branch %s already exists; skipping PR creation", repoName, branchName))
 		} else {
 			err := gitops.CreatePR(repoPath, branchName, repoCfg.DefaultBranch,
-				"gitrepoforge: apply desired state",
-				"Automated changes applied by gitrepoforge.")
+				rootCfg.Git.PRTitle,
+				rootCfg.Git.PRBody)
 			if err != nil {
 				output.Warning(fmt.Sprintf("%s: PR creation failed: %v", repoName, err))
 			}
