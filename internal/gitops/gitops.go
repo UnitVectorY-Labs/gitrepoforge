@@ -89,12 +89,22 @@ func Commit(repoPath, message string) error {
 	return nil
 }
 
-// Push pushes the current branch to origin.
-func Push(repoPath, branch string) error {
-	cmd := exec.Command("git", "push", "origin", branch)
+// Push pushes the current branch to the specified remote.
+func Push(repoPath, remote, branch string) error {
+	cmd := exec.Command("git", "push", remote, branch)
 	cmd.Dir = repoPath
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git push failed: %s: %w", string(out), err)
+	}
+	return nil
+}
+
+// DeleteBranch deletes a local branch.
+func DeleteBranch(repoPath, branch string) error {
+	cmd := exec.Command("git", "branch", "-D", branch)
+	cmd.Dir = repoPath
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git branch -D %s failed: %s: %w", branch, string(out), err)
 	}
 	return nil
 }
