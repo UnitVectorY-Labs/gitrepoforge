@@ -146,7 +146,7 @@ func loadOutputRules(outputsDir, templatesDir string) ([]FileRule, error) {
 			return nil
 		}
 		if !strings.HasSuffix(info.Name(), OutputFileSuffix) {
-			return nil
+			return fmt.Errorf("unexpected file %s in %s: output rules must end with %s", path, outputsDir, OutputFileSuffix)
 		}
 
 		relPath, err := filepath.Rel(outputsDir, path)

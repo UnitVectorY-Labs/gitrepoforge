@@ -70,6 +70,7 @@ They cannot be declared under `config/` and must not appear inside the repo's `c
 ## `outputs/`
 
 Each output rule maps to one target file. The relative path under `outputs/`, without the `.gitrepoforge` suffix, becomes the managed file path in the repo.
+Every file under `outputs/` must end with `.gitrepoforge`; unexpected filenames are treated as config errors so typos are not silently ignored.
 
 **`outputs/LICENSE.gitrepoforge`**
 
@@ -115,6 +116,13 @@ templates:
 - `absent: true` is the fallback form for "the file should not exist".
 
 ### Common Patterns
+
+Use a single unconditional candidate when the same template should always apply:
+
+```yaml
+templates:
+  - template: .github/workflows/add-to-project.yml
+```
 
 Use verbatim copy for static assets such as license files:
 

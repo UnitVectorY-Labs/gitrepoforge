@@ -122,6 +122,36 @@ func TestLoadCentralConfigSupportsAbsentTemplateCandidate(t *testing.T) {
 	}
 }
 
+func TestLoadCentralConfigSupportsUnconditionalTemplateCandidate(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "outputs/.github/workflows/add-to-project.yml.gitrepoforge", `templates:
+  - template: .github/workflows/add-to-project.yml
+`)
+	writeFile(t, dir, "templates/.github/workflows/add-to-project.yml", "name: add to project\n")
+
+	cfg, err := LoadCentralConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadCentralConfig returned error: %v", err)
+	}
+
+	if len(cfg.Files) != 1 {
+		t.Fatalf("Files length = %d, want 1", len(cfg.Files))
+	}
+	rule := cfg.Files[0]
+	if rule.Path != filepath.Join(".github", "workflows", "add-to-project.yml") {
+		t.Fatalf("rule.Path = %q, want workflow path", rule.Path)
+	}
+	if len(rule.Templates) != 1 {
+		t.Fatalf("Templates length = %d, want 1", len(rule.Templates))
+	}
+	if rule.Templates[0].Condition != "" {
+		t.Fatalf("Condition = %q, want empty", rule.Templates[0].Condition)
+	}
+	if !strings.HasSuffix(rule.Templates[0].ResolvedPath, filepath.Join("templates", ".github", "workflows", "add-to-project.yml")) {
+		t.Fatalf("unexpected resolved template path %q", rule.Templates[0].ResolvedPath)
+	}
+}
+
 func TestLoadCentralConfigRejectsReservedConfigName(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "config/name.yaml", "type: string\n")
@@ -184,6 +214,21 @@ func TestLoadCentralConfigRejectsAbsentTemplateWithTemplatePath(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	if !strings.Contains(err.Error(), "cannot also set template") {
+		t.Fatalf("unexpected error %q", err)
+	}
+}
+
+func TestLoadCentralConfigRejectsUnexpectedOutputFile(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "outputs/.github/workflows/add-to-project.yml.gitrepofroge", `templates:
+  - template: .github/workflows/add-to-project.yml
+`)
+
+	_, err := LoadCentralConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "must end with .gitrepoforge") {
 		t.Fatalf("unexpected error %q", err)
 	}
 }
