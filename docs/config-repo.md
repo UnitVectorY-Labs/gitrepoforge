@@ -218,6 +218,16 @@ templates:
   - absent: true
 ```
 
+When a value must be emitted as a quoted scalar, use `quote_double` or `quote_single` instead of adding literal quotes around the interpolation:
+
+{% raw %}
+```yaml
+description: {{ .Config.description | quote_double }}
+summary: {{ .Config.summary | quote_single }}
+go-version: {{ .Config.versions.go | quote_double }}
+```
+{% endraw %}
+
 Use `exists` when selection should depend on whether a repo explicitly set a value rather than whether a default resolved value is available:
 
 ```yaml

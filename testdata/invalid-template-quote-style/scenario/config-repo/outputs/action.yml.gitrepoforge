@@ -1,0 +1,3 @@
+templates:
+  - template: action.yml.tmpl
+    evaluate: true

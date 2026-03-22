@@ -3,6 +3,7 @@ package engine
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/UnitVectorY-Labs/gitrepoforge/internal/config"
@@ -240,6 +241,89 @@ jobs:
 	want := "name: ci\njobs:\n  test:\n    steps:\n      - uses: actions/cache@v4\n        with:\n          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}\n      - uses: codecov/codecov-action@v4\n"
 	if findings[0].Expected != want {
 		t.Fatalf("Expected = %q, want %q", findings[0].Expected, want)
+	}
+}
+
+func TestComputeFindingsQuoteHelperEscapesTemplateStrings(t *testing.T) {
+	configRepo := t.TempDir()
+	writeTestFile(t, configRepo, "templates/action.yml.tmpl", `name: test
+description: {{ .Config.description | quote_double }}
+summary: {{ .Config.summary | quote_single }}
+go-version: {{ .Config.versions.go | quote_double }}
+`)
+
+	centralCfg := &config.CentralConfig{
+		Files: []config.FileRule{
+			{
+				Path: "action.yml",
+				Templates: []config.TemplateRef{
+					{
+						Template:     "action.yml.tmpl",
+						Evaluate:     true,
+						ResolvedPath: filepath.Join(configRepo, "templates", "action.yml.tmpl"),
+					},
+				},
+			},
+		},
+	}
+	repoCfg := &config.RepoConfig{
+		Name:          "example-repo",
+		DefaultBranch: "main",
+		Config: map[string]interface{}{
+			"description": "It's \"quoted\"\nand escaped",
+			"summary":     `It's "quoted"`,
+			"versions": map[string]interface{}{
+				"go": "1.26.0",
+			},
+		},
+	}
+
+	findings, err := ComputeFindings(repoCfg, centralCfg, t.TempDir())
+	if err != nil {
+		t.Fatalf("ComputeFindings returned error: %v", err)
+	}
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(findings))
+	}
+	want := "name: test\ndescription: \"It's \\\"quoted\\\"\\nand escaped\"\nsummary: 'It''s \"quoted\"'\ngo-version: \"1.26.0\"\n"
+	if findings[0].Expected != want {
+		t.Fatalf("Expected = %q, want %q", findings[0].Expected, want)
+	}
+}
+
+func TestComputeFindingsQuoteHelperRejectsUnknownHelper(t *testing.T) {
+	configRepo := t.TempDir()
+	writeTestFile(t, configRepo, "templates/action.yml.tmpl", `description: {{ .Config.description | quote_backticks }}
+`)
+
+	centralCfg := &config.CentralConfig{
+		Files: []config.FileRule{
+			{
+				Path: "action.yml",
+				Templates: []config.TemplateRef{
+					{
+						Template:     "action.yml.tmpl",
+						Evaluate:     true,
+						ResolvedPath: filepath.Join(configRepo, "templates", "action.yml.tmpl"),
+					},
+				},
+			},
+		},
+	}
+	repoCfg := &config.RepoConfig{
+		Name:          "example-repo",
+		DefaultBranch: "main",
+		Config: map[string]interface{}{
+			"description": "quoted",
+		},
+	}
+
+	_, err := ComputeFindings(repoCfg, centralCfg, t.TempDir())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), `function "quote_backticks" not defined`) {
+		t.Fatalf("error = %q, want unknown helper message", err.Error())
 	}
 }
 

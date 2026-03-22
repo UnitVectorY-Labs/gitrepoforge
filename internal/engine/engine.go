@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"text/template"
 	"unicode"
@@ -193,6 +194,12 @@ func renderTemplateFile(path, templateMode string, data TemplateData) (string, e
 			}
 			return values[key]
 		},
+		"quote_double": func(value interface{}) string {
+			return quoteDoubleTemplateValue(value)
+		},
+		"quote_single": func(value interface{}) string {
+			return quoteSingleTemplateValue(value)
+		},
 	}
 
 	tmpl, err := template.New(filepath.Base(path)).Funcs(funcMap).Parse(preparedContent)
@@ -256,6 +263,14 @@ func escapeStrictModeDoubleBrackets(content, placeholder string) string {
 		}
 		offset = index + len("{{")
 	}
+}
+
+func quoteDoubleTemplateValue(value interface{}) string {
+	return strconv.Quote(fmt.Sprint(value))
+}
+
+func quoteSingleTemplateValue(value interface{}) string {
+	return "'" + strings.ReplaceAll(fmt.Sprint(value), "'", "''") + "'"
 }
 
 func hasStrictTemplateBoundary(content string, index int) bool {

@@ -1,0 +1,9 @@
+name: repo
+default_branch: main
+config:
+  description: |-
+    It's "quoted"
+    and escaped
+  summary: It's "quoted"
+  versions:
+    go: 1.26.0

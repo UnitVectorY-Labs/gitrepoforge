@@ -1,0 +1,4 @@
+name: test
+description: "It's \"quoted\"\nand escaped"
+summary: 'It''s "quoted"'
+go-version: "1.26.0"

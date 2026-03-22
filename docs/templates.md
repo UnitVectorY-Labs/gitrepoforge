@@ -17,6 +17,8 @@ When `evaluate: true` is set on a candidate, the file is rendered with:
 | Function | Description |
 |----------|-------------|
 | `getConfig` | Looks up a config value by key. |
+| `quote_double` | Returns a double-quoted string with escaping applied. |
+| `quote_single` | Returns a single-quoted string with escaping applied by doubling embedded single quotes. |
 
 Go template built-ins such as `if`, `eq`, `ne`, `and`, and `or` are also available.
 
@@ -101,3 +103,13 @@ key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
 {% endraw %}
 
 In strict mode, the {% raw %}`${{ ... }}`{% endraw %} expressions stay literal because the {% raw %}`{{`{% endraw %} is preceded by `$`, while the control blocks still execute because they start on their own lines.
+
+Use `quote_double` or `quote_single` when a rendered value must become a quoted string literal without manually adding quotes in the template:
+
+{% raw %}
+```yaml
+description: {{ .Config.description | quote_double }}
+summary: {{ .Config.summary | quote_single }}
+go-version: {{ .Config.versions.go | quote_double }}
+```
+{% endraw %}
