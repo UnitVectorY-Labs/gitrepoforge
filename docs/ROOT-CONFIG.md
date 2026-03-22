@@ -1,3 +1,10 @@
+---
+layout: default
+title: Root Config
+nav_order: 3
+permalink: /root-config
+---
+
 # Root Config
 
 The root config lives at the workspace root, outside the managed repos, in `.gitrepoforge-config`.

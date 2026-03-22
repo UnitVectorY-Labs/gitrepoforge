@@ -1,10 +1,17 @@
+---
+layout: default
+title: Commands
+nav_order: 2
+permalink: /commands
+---
+
 # Commands
 
 gitrepoforge provides three commands: `validate`, `apply`, and `bootstrap`.
 
 ## validate
 
-Dry-run audit. Discovers repos, validates configs, computes findings, and reports drift — without making any changes.
+Dry-run audit. Discovers repos, validates configs, computes findings, and reports drift without making any changes.
 
 ```
 gitrepoforge validate [flags]
@@ -34,10 +41,10 @@ When `--verbose` is set, drift findings also include per-file diffs showing remo
 
 | Status | Meaning |
 |--------|---------|
-| `clean` | Repo is compliant — no changes needed. |
+| `clean` | Repo is compliant and no changes are needed. |
 | `skipped` | Repo has no `.gitrepoforge` file. |
-| `invalid` | Validation errors (missing config values, type mismatches, etc.). |
-| `drift` | Findings detected — files differ from desired state. |
+| `invalid` | Validation errors such as missing config values or type mismatches. |
+| `drift` | Findings were detected and files differ from the desired state. |
 
 ## apply
 
@@ -71,10 +78,10 @@ gitrepoforge apply [flags]
 
 | Status | Meaning |
 |--------|---------|
-| `clean` | Already compliant — nothing to do. |
-| `skipped` | No `.gitrepoforge` file. |
-| `invalid` | Validation errors. |
-| `applied` | Changes were written successfully, with any configured Git automation completed. |
+| `clean` | Already compliant and nothing needs to change. |
+| `skipped` | No `.gitrepoforge` file was found. |
+| `invalid` | Validation errors prevented apply. |
+| `applied` | Changes were written successfully, including any configured Git automation. |
 | `failed` | An error occurred during Git operations. |
 
 ## bootstrap

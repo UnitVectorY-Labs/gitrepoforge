@@ -1,4 +1,11 @@
-# Overview
+---
+layout: default
+title: gitrepoforge
+nav_order: 1
+permalink: /
+---
+
+# gitrepoforge
 
 gitrepoforge is a command-line tool that audits and applies standard file patterns across Git repositories in a workspace.
 
@@ -10,18 +17,18 @@ When managing many repositories, it is common to need consistent files such as l
 
 ```
 workspace/
-├── .gitrepoforge-config        # Root config — points to the config repo and shared Git automation
+├── .gitrepoforge-config        # Root config points to the config repo and shared Git automation
 ├── config-repo/
-│   ├── config/                 # Config definitions — one YAML file per key
+│   ├── config/                 # Config definitions, one YAML file per key
 │   │   └── license.yaml
-│   ├── outputs/                # Output rules — path mirrors target, .gitrepoforge suffix
+│   ├── outputs/                # Output rules, path mirrors target with .gitrepoforge suffix
 │   │   └── LICENSE.gitrepoforge
 │   └── templates/              # Template files referenced by outputs
 │       └── licenses/
 │           ├── apache-2.0.tmpl
 │           └── mit.tmpl
 ├── repo-a/
-│   └── .gitrepoforge           # Per-repo config — name, default branch, and config values
+│   └── .gitrepoforge           # Per-repo config with name, default branch, and config values
 ├── repo-b/
 │   └── .gitrepoforge
 └── ...
@@ -48,8 +55,8 @@ workspace/
 
 ### Commands
 
-- **`validate`** — Dry-run audit. Reports drift without making changes.
-- **`apply`** — Applies the desired state and, when configured, runs shared Git automation.
-- **`bootstrap`** — Like apply, but targeted to a single repo for first-time setup.
+- **`validate`**: Dry-run audit. Reports drift without making changes.
+- **`apply`**: Applies the desired state and, when configured, runs shared Git automation.
+- **`bootstrap`**: Like apply, but targeted to a single repo for first-time setup.
 
-See [commands.md](commands.md) for full details.
+See [Commands](/commands) for full details.

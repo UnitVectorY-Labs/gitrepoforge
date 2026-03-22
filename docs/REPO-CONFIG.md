@@ -1,3 +1,10 @@
+---
+layout: default
+title: Per-Repo Config
+nav_order: 4
+permalink: /repo-config
+---
+
 # Per-Repo Config
 
 Each managed repository can opt in with a `.gitrepoforge` file at its root.

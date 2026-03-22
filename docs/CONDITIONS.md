@@ -1,3 +1,10 @@
+---
+layout: default
+title: Condition Syntax
+nav_order: 7
+permalink: /conditions
+---
+
 # Condition Syntax
 
 Conditions are only used to decide whether a template candidate matches. The result is always boolean.

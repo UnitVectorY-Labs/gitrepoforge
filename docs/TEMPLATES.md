@@ -1,3 +1,10 @@
+---
+layout: default
+title: Template Files
+nav_order: 6
+permalink: /templates
+---
+
 # Template Files
 
 Templates live in the config repo under `templates/`. Output rules point at files in that folder and choose whether to copy them verbatim or evaluate them as templates.

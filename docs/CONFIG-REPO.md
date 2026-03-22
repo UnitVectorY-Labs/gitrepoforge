@@ -1,3 +1,10 @@
+---
+layout: default
+title: Config Repo
+nav_order: 6
+permalink: /config-repo
+---
+
 # Config Repo
 
 The config repo contains the shared definitions and file rules used across repositories.
@@ -134,7 +141,7 @@ templates:
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `condition` | no | Boolean selector for the candidate. Empty means always matches, which is useful for a fallthrough entry. Supported forms are documented in [Condition Syntax](/Users/jaredhatfield/github/gitrepoforge/docs/conditions.md). |
+| `condition` | no | Boolean selector for the candidate. Empty means always matches, which is useful for a fallthrough entry. Supported forms are documented in [Condition Syntax](/conditions). |
 | `template` | yes unless `absent` is true | Path to a file under `templates/`. |
 | `evaluate` | no | If true, render the template file with template data. If false or omitted, copy the file verbatim. |
 | `template_mode` | no | Controls how template delimiters are recognized when `evaluate` is true. `DOUBLE_BRACKET` is the default. `DOUBLE_BRACKET_STRICT` only recognizes {% raw %}`{{`{% endraw %} when it is at the start of the file or preceded by whitespace. |
@@ -256,4 +263,4 @@ Use parentheses when grouping is needed, for example `(docs.enabled || preview_d
 
 ## `templates/`
 
-The `templates/` folder stores the file content referenced by output rules. See [Template Files](/Users/jaredhatfield/github/gitrepoforge/docs/templates.md) for rendering details.
+The `templates/` folder stores the file content referenced by output rules. See [Template Files](/templates) for rendering details.
