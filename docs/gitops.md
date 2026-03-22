@@ -1,32 +1,32 @@
 # Git Operations
 
-gitrepoforge performs Git operations during `apply` and `bootstrap` when the root config enables them. All operations run inside each target repository using the local `git` CLI and, for pull requests, the GitHub CLI (`gh`). The behavior of each step is controlled by the `git` section in the root config (see [root-config.md](root-config.md)).
+gitrepoforge performs Git operations during `apply` and `bootstrap` when the root config enables them. All operations run inside each target repository using the local `git` CLI and, for pull requests, the GitHub CLI (`gh`). The behavior of each step is controlled by the Git fields in the root config (see [root-config.md](root-config.md)).
 
 If no Git automation is configured, `apply` and `bootstrap` still write the managed files; they simply stop before any Git commands.
 
 ## Branch Creation
 
-If `git.create_branch` is `true`, gitrepoforge:
+If `create_branch` is `true`, gitrepoforge:
 
 - Reads the repository's current branch
-- Expands `git.branch_name` using the target repo's placeholder values
+- Expands `branch_name` using the target repo's placeholder values
 - Runs `git checkout -b {branch}`
 
 Branch creation happens from the current branch, not from `default_branch`.
 
 ## Commits
 
-If `git.commit` is `true`, gitrepoforge stages and commits the modified files:
+If `commit` is `true`, gitrepoforge stages and commits the modified files:
 
 1. **Stage** all changes: `git add -A`
 2. **Check** for staged changes: `git diff --cached --quiet`
-3. If changes exist, **commit** with the expanded `git.commit_message`
+3. If changes exist, **commit** with the expanded `commit_message`
 
 If there are no staged changes after applying rules, the repo is reported as `clean` and no commit is made.
 
 ## Push
 
-If `git.push` is `true`, gitrepoforge pushes the active branch to the configured remote after a successful commit:
+If `push` is `true`, gitrepoforge pushes the active branch to the configured remote after a successful commit:
 
 ```
 git push {remote} {branch}
@@ -36,32 +36,32 @@ git push {remote} {branch}
 
 ## Pull Request Creation
 
-If `git.pull_request` is `GITHUB_CLI`, gitrepoforge opens a pull request after a successful push:
+If `pull_request` is `GITHUB_CLI`, gitrepoforge opens a pull request after a successful push:
 
 ```
 gh pr create --fill
 ```
 
-- If `git.pull_request` is `NO` (the default), no PR is created.
+- If `pull_request` is `NO` (the default), no PR is created.
 
 ### Prerequisites
 
 - The `gh` CLI must be installed and authenticated.
-- The repo must have a GitHub remote matching the configured `git.remote`.
+- The repo must have a GitHub remote matching the configured `remote`.
 
 ## Return To Original Branch
 
-If `git.return_to_original_branch` is `true`, gitrepoforge checks out back to the branch that was active before it started:
+If `return_to_original_branch` is `true`, gitrepoforge checks out back to the branch that was active before it started:
 
 ```
 git checkout {original_branch}
 ```
 
-If `git.return_to_original_branch` is `false`, gitrepoforge leaves the working tree on the feature branch.
+If `return_to_original_branch` is `false`, gitrepoforge leaves the working tree on the feature branch.
 
 ## Branch Deletion
 
-If `git.delete_branch` is `true` and `git.return_to_original_branch` is also `true`, gitrepoforge deletes the local feature branch after switching back to the original branch:
+If `delete_branch` is `true` and `return_to_original_branch` is also `true`, gitrepoforge deletes the local feature branch after switching back to the original branch:
 
 ```
 git branch -D {branch}

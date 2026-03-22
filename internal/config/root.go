@@ -26,10 +26,16 @@ type GitConfig struct {
 type RootConfig struct {
 	ConfigRepo string    `yaml:"config_repo"`
 	Excludes   []string  `yaml:"excludes"`
-	Git        GitConfig `yaml:"git"`
+	Git        GitConfig `yaml:"-"`
 }
 
 const RootConfigFileName = ".gitrepoforge-config"
+
+type rawRootConfig struct {
+	ConfigRepo string   `yaml:"config_repo"`
+	Excludes   []string `yaml:"excludes"`
+	GitConfig  `yaml:",inline"`
+}
 
 func LoadRootConfig(workspaceDir string) (*RootConfig, error) {
 	path := filepath.Join(workspaceDir, RootConfigFileName)
@@ -38,9 +44,14 @@ func LoadRootConfig(workspaceDir string) (*RootConfig, error) {
 		return nil, fmt.Errorf("failed to read root config %s: %w", path, err)
 	}
 
-	var cfg RootConfig
-	if err := unmarshalYAMLKnownFields(data, &cfg); err != nil {
+	var raw rawRootConfig
+	if err := unmarshalYAMLKnownFields(data, &raw); err != nil {
 		return nil, fmt.Errorf("failed to parse root config %s: %w", path, err)
+	}
+	cfg := RootConfig{
+		ConfigRepo: raw.ConfigRepo,
+		Excludes:   raw.Excludes,
+		Git:        raw.GitConfig,
 	}
 	if cfg.ConfigRepo == "" {
 		return nil, fmt.Errorf("root config %s: config_repo is required", path)

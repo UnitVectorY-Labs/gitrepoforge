@@ -221,16 +221,15 @@ func TestLoadCentralConfigRejectsAbsentTemplateWithTemplatePath(t *testing.T) {
 func TestLoadRootConfigGitSection(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-git:
-  create_branch: true
-  branch_name: "ops/{{name}}"
-  commit: true
-  commit_message: "custom commit"
-  push: true
-  remote: upstream
-  pull_request: GITHUB_CLI
-  return_to_original_branch: true
-  delete_branch: true
+create_branch: true
+branch_name: "ops/{{name}}"
+commit: true
+commit_message: "custom commit"
+push: true
+remote: upstream
+pull_request: GITHUB_CLI
+return_to_original_branch: true
+delete_branch: true
 `)
 
 	cfg, err := LoadRootConfig(dir)
@@ -323,8 +322,7 @@ create_pr: true
 func TestLoadRootConfigRejectsUnknownGitField(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-git:
-  bootstrap_commit_message: "legacy"
+bootstrap_commit_message: "legacy"
 `)
 
 	_, err := LoadRootConfig(dir)
@@ -336,8 +334,7 @@ git:
 func TestLoadRootConfigRejectsInvalidPullRequest(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-git:
-  pull_request: INVALID
+pull_request: INVALID
 `)
 
 	_, err := LoadRootConfig(dir)
@@ -352,9 +349,8 @@ git:
 func TestLoadRootConfigRejectsPRWithoutPush(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-git:
-  push: false
-  pull_request: GITHUB_CLI
+push: false
+pull_request: GITHUB_CLI
 `)
 
 	_, err := LoadRootConfig(dir)
@@ -369,9 +365,8 @@ git:
 func TestLoadRootConfigRejectsDeleteBranchWithoutReturn(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-git:
-  return_to_original_branch: false
-  delete_branch: true
+return_to_original_branch: false
+delete_branch: true
 `)
 
 	_, err := LoadRootConfig(dir)
@@ -386,8 +381,7 @@ git:
 func TestLoadRootConfigRejectsReturnWithoutCreateBranch(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-git:
-  return_to_original_branch: true
+return_to_original_branch: true
 `)
 
 	_, err := LoadRootConfig(dir)
@@ -402,8 +396,7 @@ git:
 func TestLoadRootConfigPushFalse(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-git:
-  push: false
+push: false
 `)
 
 	cfg, err := LoadRootConfig(dir)
@@ -419,10 +412,9 @@ git:
 func TestLoadRootConfigPullRequestCaseInsensitive(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-git:
-  push: true
-  remote: origin
-  pull_request: github_cli
+push: true
+remote: origin
+pull_request: github_cli
 `)
 
 	cfg, err := LoadRootConfig(dir)

@@ -8,16 +8,15 @@ The root config lives at the workspace root, outside the managed repos, in `.git
 config_repo: config-repo
 excludes:
   - archived-*
-git:
-  create_branch: true
-  branch_name: "gitrepoforge/{{name}}"
-  commit: true
-  commit_message: "gitrepoforge: apply desired state for {{name}}"
-  push: true
-  remote: origin
-  pull_request: GITHUB_CLI
-  return_to_original_branch: true
-  delete_branch: true
+create_branch: true
+branch_name: "gitrepoforge/{{name}}"
+commit: true
+commit_message: "gitrepoforge: apply desired state for {{name}}"
+push: true
+remote: origin
+pull_request: GITHUB_CLI
+return_to_original_branch: true
+delete_branch: true
 ```
 
 ## Fields
@@ -26,11 +25,10 @@ git:
 |-------|----------|-------------|
 | `config_repo` | yes | Relative or absolute path to the config repo. |
 | `excludes` | no | Repo folder globs to skip during discovery. |
-| `git` | no | Git automation options (see below). |
 
-## Git Section
+## Git Fields
 
-The `git` section controls how `apply` and `bootstrap` interact with Git across the workspace. Its shape intentionally mirrors the repver Git config, but it is defined once in `.gitrepoforge-config` and applied to each managed repository.
+The Git-related fields in `.gitrepoforge-config` control how `apply` and `bootstrap` interact with Git across the workspace. Their shape intentionally mirrors the repver Git config, but they are defined once in the root config and applied to each managed repository.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -65,4 +63,4 @@ The `git` section controls how `apply` and `bootstrap` interact with Git across 
 
 ### Removed Fields
 
-The old Git fields and compatibility aliases are no longer supported. In particular, `branch_prefix`, `create_pr`, `bootstrap_commit_message`, `pr_title`, `pr_body`, `bootstrap_pr_title`, and `bootstrap_pr_body` are invalid.
+The old Git fields and compatibility aliases are no longer supported. In particular, nested `git:` config, `branch_prefix`, `create_pr`, `bootstrap_commit_message`, `pr_title`, `pr_body`, `bootstrap_pr_title`, and `bootstrap_pr_body` are invalid.

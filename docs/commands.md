@@ -60,12 +60,12 @@ gitrepoforge apply [flags]
 2. For each repo with findings:
    - Applies file changes (`create`, `update`, `delete`).
    - If root Git automation is enabled, requires a clean working tree before running Git commands.
-   - If `git.create_branch` is `true`, creates the configured branch from the repo's current branch.
-   - If `git.commit` is `true`, stages and commits the changes.
-   - If `git.push` is `true`, pushes the active branch to `git.remote`.
-   - If `git.pull_request` is `GITHUB_CLI`, opens a PR via `gh pr create --fill`.
-   - If `git.return_to_original_branch` is `true`, switches back to the original branch.
-   - If `git.delete_branch` is `true`, deletes the created branch after returning.
+   - If `create_branch` is `true`, creates the configured branch from the repo's current branch.
+   - If `commit` is `true`, stages and commits the changes.
+   - If `push` is `true`, pushes the active branch to `remote`.
+   - If `pull_request` is `GITHUB_CLI`, opens a PR via `gh pr create --fill`.
+   - If `return_to_original_branch` is `true`, switches back to the original branch.
+   - If `delete_branch` is `true`, deletes the created branch after returning.
 
 ### Statuses
 
