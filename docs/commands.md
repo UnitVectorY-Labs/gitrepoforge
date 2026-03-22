@@ -61,10 +61,11 @@ gitrepoforge apply [flags]
    - Creates branch `{branch_prefix}update` (e.g. `gitrepoforge/update`).
    - Applies file changes (`create`, `update`, `delete`).
    - Stages all changes with `git add -A`.
-   - Commits with message `"gitrepoforge: apply desired state"`.
-   - Pushes to `origin`.
-   - If `create_pr` is enabled and the remote branch did not already exist, opens a PR via `gh pr create`.
-   - Checks out back to the default branch.
+   - Commits with the configured `git.commit_message` (default: `"gitrepoforge: apply desired state"`).
+   - If `git.push` is `true`, pushes to the configured `git.remote`.
+   - If `git.pull_request` is `GITHUB_CLI` and the remote branch did not already exist, opens a PR via `gh pr create`.
+   - If `git.return_to_original_branch` is `true`, checks out back to the default branch.
+   - If `git.delete_branch` is `true`, deletes the local feature branch.
 
 ### Statuses
 
@@ -96,7 +97,8 @@ gitrepoforge bootstrap --repo <name> [flags]
 Same as `apply` with these differences:
 
 - Branch name: `{branch_prefix}bootstrap` (e.g. `gitrepoforge/bootstrap`).
-- Commit message: `"gitrepoforge: bootstrap repo"`.
+- Commit message: configured via `git.bootstrap_commit_message` (default: `"gitrepoforge: bootstrap repo"`).
+- PR title/body use `git.bootstrap_pr_title` and `git.bootstrap_pr_body`.
 
 ## Output
 
