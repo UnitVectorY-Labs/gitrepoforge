@@ -17,7 +17,7 @@ config:
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name` | yes | Must match the repository folder name. |
-| `default_branch` | yes | Branch used as the checkout/PR base for this specific repository. |
+| `default_branch` | yes | Repository metadata made available to templates and root-level Git placeholders. |
 | `config` | no | Values that match keys defined in the config repo's `config/` folder. Missing keys may be filled from definition defaults. |
 
 ## Validation Rules
@@ -27,6 +27,7 @@ config:
 - Required config keys must be present.
 - Missing keys use the definition's `default` value when one is provided.
 - Reserved top-level field names such as `name` and `default_branch` cannot appear inside `config:`.
+- The repo config does not contain a top-level `git` section; Git automation is configured only in `.gitrepoforge-config`.
 - Unknown config keys are rejected.
 - Values must match the declared type.
 - String values with `enum` must use one of the allowed values.

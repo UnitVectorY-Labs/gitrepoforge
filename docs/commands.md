@@ -41,7 +41,7 @@ When `--verbose` is set, drift findings also include per-file diffs showing remo
 
 ## apply
 
-Applies the desired state to repos by creating a branch, writing files, committing, pushing, and optionally opening a pull request.
+Applies the desired state to repos by writing files and then optionally running the shared Git automation from `.gitrepoforge-config`.
 
 ```
 gitrepoforge apply [flags]
@@ -58,14 +58,14 @@ gitrepoforge apply [flags]
 
 1. Same discovery and validation as `validate`.
 2. For each repo with findings:
-   - Creates branch `{branch_prefix}update` (e.g. `gitrepoforge/update`).
    - Applies file changes (`create`, `update`, `delete`).
-   - Stages all changes with `git add -A`.
-   - Commits with the configured `git.commit_message` (default: `"gitrepoforge: apply desired state"`).
-   - If `git.push` is `true`, pushes to the configured `git.remote`.
-   - If `git.pull_request` is `GITHUB_CLI` and the remote branch did not already exist, opens a PR via `gh pr create`.
-   - If `git.return_to_original_branch` is `true`, checks out back to the default branch.
-   - If `git.delete_branch` is `true`, deletes the local feature branch.
+   - If root Git automation is enabled, requires a clean working tree before running Git commands.
+   - If `git.create_branch` is `true`, creates the configured branch from the repo's current branch.
+   - If `git.commit` is `true`, stages and commits the changes.
+   - If `git.push` is `true`, pushes the active branch to `git.remote`.
+   - If `git.pull_request` is `GITHUB_CLI`, opens a PR via `gh pr create --fill`.
+   - If `git.return_to_original_branch` is `true`, switches back to the original branch.
+   - If `git.delete_branch` is `true`, deletes the created branch after returning.
 
 ### Statuses
 
@@ -74,12 +74,12 @@ gitrepoforge apply [flags]
 | `clean` | Already compliant — nothing to do. |
 | `skipped` | No `.gitrepoforge` file. |
 | `invalid` | Validation errors. |
-| `applied` | Changes committed and pushed. |
+| `applied` | Changes were written successfully, with any configured Git automation completed. |
 | `failed` | An error occurred during Git operations. |
 
 ## bootstrap
 
-Initializes a repo for the first time. Behaves like `apply` but uses a different branch name and commit message.
+Initializes a repo for the first time. It uses the same Git behavior as `apply`, but requires `--repo` so you target a single repository explicitly.
 
 ```
 gitrepoforge bootstrap --repo <name> [flags]
@@ -94,11 +94,7 @@ gitrepoforge bootstrap --repo <name> [flags]
 
 ### Behavior
 
-Same as `apply` with these differences:
-
-- Branch name: `{branch_prefix}bootstrap` (e.g. `gitrepoforge/bootstrap`).
-- Commit message: configured via `git.bootstrap_commit_message` (default: `"gitrepoforge: bootstrap repo"`).
-- PR title/body use `git.bootstrap_pr_title` and `git.bootstrap_pr_body`.
+Same as `apply`, but limited to the explicitly named repo.
 
 ## Output
 

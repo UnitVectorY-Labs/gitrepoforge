@@ -31,8 +31,8 @@ func TestLoadRootConfig(t *testing.T) {
 	if cfg.ConfigRepo != "config-repo" {
 		t.Fatalf("ConfigRepo = %q, want %q", cfg.ConfigRepo, "config-repo")
 	}
-	if cfg.Git.BranchPrefix != "gitrepoforge/" {
-		t.Fatalf("Git.BranchPrefix = %q, want default %q", cfg.Git.BranchPrefix, "gitrepoforge/")
+	if cfg.Git.PullRequest != PullRequestNo {
+		t.Fatalf("Git.PullRequest = %q, want default %q", cfg.Git.PullRequest, PullRequestNo)
 	}
 }
 
@@ -222,16 +222,13 @@ func TestLoadRootConfigGitSection(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
 git:
-  branch_prefix: custom/
+  create_branch: true
+  branch_name: "ops/{{name}}"
+  commit: true
   commit_message: "custom commit"
-  bootstrap_commit_message: "custom bootstrap"
   push: true
   remote: upstream
   pull_request: GITHUB_CLI
-  pr_title: "Custom PR"
-  pr_body: "Custom body"
-  bootstrap_pr_title: "Bootstrap PR"
-  bootstrap_pr_body: "Bootstrap body"
   return_to_original_branch: true
   delete_branch: true
 `)
@@ -241,16 +238,19 @@ git:
 		t.Fatalf("LoadRootConfig returned error: %v", err)
 	}
 
-	if cfg.Git.BranchPrefix != "custom/" {
-		t.Fatalf("Git.BranchPrefix = %q, want %q", cfg.Git.BranchPrefix, "custom/")
+	if !cfg.Git.CreateBranch {
+		t.Fatalf("Git.CreateBranch = false, want true")
+	}
+	if cfg.Git.BranchName != "ops/{{name}}" {
+		t.Fatalf("Git.BranchName = %q, want %q", cfg.Git.BranchName, "ops/{{name}}")
+	}
+	if !cfg.Git.Commit {
+		t.Fatalf("Git.Commit = false, want true")
 	}
 	if cfg.Git.CommitMessage != "custom commit" {
 		t.Fatalf("Git.CommitMessage = %q, want %q", cfg.Git.CommitMessage, "custom commit")
 	}
-	if cfg.Git.BootstrapCommitMessage != "custom bootstrap" {
-		t.Fatalf("Git.BootstrapCommitMessage = %q, want %q", cfg.Git.BootstrapCommitMessage, "custom bootstrap")
-	}
-	if !*cfg.Git.Push {
+	if !cfg.Git.Push {
 		t.Fatalf("Git.Push = false, want true")
 	}
 	if cfg.Git.Remote != "upstream" {
@@ -259,19 +259,7 @@ git:
 	if cfg.Git.PullRequest != PullRequestGitHubCLI {
 		t.Fatalf("Git.PullRequest = %q, want %q", cfg.Git.PullRequest, PullRequestGitHubCLI)
 	}
-	if cfg.Git.PRTitle != "Custom PR" {
-		t.Fatalf("Git.PRTitle = %q, want %q", cfg.Git.PRTitle, "Custom PR")
-	}
-	if cfg.Git.PRBody != "Custom body" {
-		t.Fatalf("Git.PRBody = %q, want %q", cfg.Git.PRBody, "Custom body")
-	}
-	if cfg.Git.BootstrapPRTitle != "Bootstrap PR" {
-		t.Fatalf("Git.BootstrapPRTitle = %q, want %q", cfg.Git.BootstrapPRTitle, "Bootstrap PR")
-	}
-	if cfg.Git.BootstrapPRBody != "Bootstrap body" {
-		t.Fatalf("Git.BootstrapPRBody = %q, want %q", cfg.Git.BootstrapPRBody, "Bootstrap body")
-	}
-	if !*cfg.Git.ReturnToOriginalBranch {
+	if !cfg.Git.ReturnToOriginalBranch {
 		t.Fatalf("Git.ReturnToOriginalBranch = false, want true")
 	}
 	if !cfg.Git.DeleteBranch {
@@ -288,112 +276,60 @@ func TestLoadRootConfigGitDefaults(t *testing.T) {
 		t.Fatalf("LoadRootConfig returned error: %v", err)
 	}
 
-	if cfg.Git.BranchPrefix != "gitrepoforge/" {
-		t.Fatalf("Git.BranchPrefix = %q, want %q", cfg.Git.BranchPrefix, "gitrepoforge/")
+	if cfg.Git.CreateBranch {
+		t.Fatalf("Git.CreateBranch = true, want false")
 	}
-	if cfg.Git.CommitMessage != "gitrepoforge: apply desired state" {
-		t.Fatalf("Git.CommitMessage = %q, want default", cfg.Git.CommitMessage)
+	if cfg.Git.Commit {
+		t.Fatalf("Git.Commit = true, want false")
 	}
-	if cfg.Git.BootstrapCommitMessage != "gitrepoforge: bootstrap repo" {
-		t.Fatalf("Git.BootstrapCommitMessage = %q, want default", cfg.Git.BootstrapCommitMessage)
-	}
-	if !*cfg.Git.Push {
-		t.Fatalf("Git.Push = false, want true (default)")
-	}
-	if cfg.Git.Remote != "origin" {
-		t.Fatalf("Git.Remote = %q, want %q", cfg.Git.Remote, "origin")
+	if cfg.Git.Push {
+		t.Fatalf("Git.Push = true, want false")
 	}
 	if cfg.Git.PullRequest != PullRequestNo {
 		t.Fatalf("Git.PullRequest = %q, want %q", cfg.Git.PullRequest, PullRequestNo)
 	}
-	if cfg.Git.PRTitle != cfg.Git.CommitMessage {
-		t.Fatalf("Git.PRTitle = %q, want commit message as default", cfg.Git.PRTitle)
-	}
-	if cfg.Git.PRBody != "Automated changes applied by gitrepoforge." {
-		t.Fatalf("Git.PRBody = %q, want default", cfg.Git.PRBody)
-	}
-	if cfg.Git.BootstrapPRTitle != cfg.Git.BootstrapCommitMessage {
-		t.Fatalf("Git.BootstrapPRTitle = %q, want bootstrap commit message as default", cfg.Git.BootstrapPRTitle)
-	}
-	if cfg.Git.BootstrapPRBody != "Automated bootstrap by gitrepoforge." {
-		t.Fatalf("Git.BootstrapPRBody = %q, want default", cfg.Git.BootstrapPRBody)
-	}
-	if !*cfg.Git.ReturnToOriginalBranch {
-		t.Fatalf("Git.ReturnToOriginalBranch = false, want true (default)")
+	if cfg.Git.ReturnToOriginalBranch {
+		t.Fatalf("Git.ReturnToOriginalBranch = true, want false")
 	}
 	if cfg.Git.DeleteBranch {
 		t.Fatalf("Git.DeleteBranch = true, want false (default)")
 	}
 }
 
-func TestLoadRootConfigBackwardCompatBranchPrefix(t *testing.T) {
+func TestLoadRootConfigRejectsLegacyBranchPrefix(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
 branch_prefix: legacy/
 `)
 
-	cfg, err := LoadRootConfig(dir)
-	if err != nil {
-		t.Fatalf("LoadRootConfig returned error: %v", err)
-	}
-
-	if cfg.Git.BranchPrefix != "legacy/" {
-		t.Fatalf("Git.BranchPrefix = %q, want %q from legacy field", cfg.Git.BranchPrefix, "legacy/")
+	_, err := LoadRootConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
 	}
 }
 
-func TestLoadRootConfigBackwardCompatCreatePR(t *testing.T) {
+func TestLoadRootConfigRejectsLegacyCreatePR(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
 create_pr: true
 `)
 
-	cfg, err := LoadRootConfig(dir)
-	if err != nil {
-		t.Fatalf("LoadRootConfig returned error: %v", err)
-	}
-
-	if cfg.Git.PullRequest != PullRequestGitHubCLI {
-		t.Fatalf("Git.PullRequest = %q, want %q from legacy create_pr: true", cfg.Git.PullRequest, PullRequestGitHubCLI)
+	_, err := LoadRootConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
 	}
 }
 
-func TestLoadRootConfigBackwardCompatCreatePRFalse(t *testing.T) {
+func TestLoadRootConfigRejectsUnknownGitField(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-create_pr: false
-`)
-
-	cfg, err := LoadRootConfig(dir)
-	if err != nil {
-		t.Fatalf("LoadRootConfig returned error: %v", err)
-	}
-
-	if cfg.Git.PullRequest != PullRequestNo {
-		t.Fatalf("Git.PullRequest = %q, want %q from legacy create_pr: false", cfg.Git.PullRequest, PullRequestNo)
-	}
-}
-
-func TestLoadRootConfigGitSectionOverridesLegacy(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-branch_prefix: legacy/
-create_pr: true
 git:
-  branch_prefix: modern/
-  pull_request: "NO"
+  bootstrap_commit_message: "legacy"
 `)
 
-	cfg, err := LoadRootConfig(dir)
-	if err != nil {
-		t.Fatalf("LoadRootConfig returned error: %v", err)
-	}
-
-	if cfg.Git.BranchPrefix != "modern/" {
-		t.Fatalf("Git.BranchPrefix = %q, want %q (git section takes precedence)", cfg.Git.BranchPrefix, "modern/")
-	}
-	if cfg.Git.PullRequest != PullRequestNo {
-		t.Fatalf("Git.PullRequest = %q, want %q (git section takes precedence)", cfg.Git.PullRequest, PullRequestNo)
+	_, err := LoadRootConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
 	}
 }
 
@@ -425,7 +361,7 @@ git:
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "git.push is false") {
+	if !strings.Contains(err.Error(), "requires git.push") {
 		t.Fatalf("error %q does not mention push constraint", err)
 	}
 }
@@ -447,6 +383,22 @@ git:
 	}
 }
 
+func TestLoadRootConfigRejectsReturnWithoutCreateBranch(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
+git:
+  return_to_original_branch: true
+`)
+
+	_, err := LoadRootConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "create_branch") {
+		t.Fatalf("error %q does not mention create_branch constraint", err)
+	}
+}
+
 func TestLoadRootConfigPushFalse(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
@@ -459,7 +411,7 @@ git:
 		t.Fatalf("LoadRootConfig returned error: %v", err)
 	}
 
-	if *cfg.Git.Push {
+	if cfg.Git.Push {
 		t.Fatalf("Git.Push = true, want false")
 	}
 }
@@ -468,6 +420,8 @@ func TestLoadRootConfigPullRequestCaseInsensitive(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
 git:
+  push: true
+  remote: origin
   pull_request: github_cli
 `)
 
@@ -521,5 +475,22 @@ config:
 	}
 	if cfg.Config["enabled"] != true {
 		t.Fatalf("Config[enabled] = %v, want true", cfg.Config["enabled"])
+	}
+}
+
+func TestLoadRepoConfigRejectsUnknownTopLevelField(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RepoConfigFileName, `name: example-repo
+default_branch: main
+git:
+  create_branch: true
+`)
+
+	_, err := LoadRepoConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "field git not found") {
+		t.Fatalf("unexpected error %q", err)
 	}
 }

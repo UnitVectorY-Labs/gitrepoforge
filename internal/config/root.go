@@ -5,24 +5,19 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 )
 
-// GitConfig controls the Git automation performed during apply and bootstrap
-// commands. It mirrors the git configuration section from the repver tool.
+// GitConfig controls the Git automation performed during apply and bootstrap.
+// It mirrors the git configuration section from the repver tool.
 type GitConfig struct {
-	BranchPrefix           string `yaml:"branch_prefix"`
+	CreateBranch           bool   `yaml:"create_branch"`
+	BranchName             string `yaml:"branch_name"`
+	Commit                 bool   `yaml:"commit"`
 	CommitMessage          string `yaml:"commit_message"`
-	BootstrapCommitMessage string `yaml:"bootstrap_commit_message"`
-	Push                   *bool  `yaml:"push"`
+	Push                   bool   `yaml:"push"`
 	Remote                 string `yaml:"remote"`
 	PullRequest            string `yaml:"pull_request"`
-	PRTitle                string `yaml:"pr_title"`
-	PRBody                 string `yaml:"pr_body"`
-	BootstrapPRTitle       string `yaml:"bootstrap_pr_title"`
-	BootstrapPRBody        string `yaml:"bootstrap_pr_body"`
-	ReturnToOriginalBranch *bool  `yaml:"return_to_original_branch"`
+	ReturnToOriginalBranch bool   `yaml:"return_to_original_branch"`
 	DeleteBranch           bool   `yaml:"delete_branch"`
 }
 
@@ -36,116 +31,74 @@ type RootConfig struct {
 
 const RootConfigFileName = ".gitrepoforge-config"
 
-// rawRootConfig is used internally to handle backward compatibility with the
-// legacy top-level branch_prefix and create_pr fields.
-type rawRootConfig struct {
-	ConfigRepo string    `yaml:"config_repo"`
-	Excludes   []string  `yaml:"excludes"`
-	Git        GitConfig `yaml:"git"`
-
-	// Deprecated: use Git.BranchPrefix
-	BranchPrefix string `yaml:"branch_prefix"`
-	// Deprecated: use Git.PullRequest
-	CreatePR *bool `yaml:"create_pr"`
-}
-
 func LoadRootConfig(workspaceDir string) (*RootConfig, error) {
 	path := filepath.Join(workspaceDir, RootConfigFileName)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read root config %s: %w", path, err)
 	}
-	var raw rawRootConfig
-	if err := yaml.Unmarshal(data, &raw); err != nil {
+
+	var cfg RootConfig
+	if err := unmarshalYAMLKnownFields(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse root config %s: %w", path, err)
 	}
-	if raw.ConfigRepo == "" {
+	if cfg.ConfigRepo == "" {
 		return nil, fmt.Errorf("root config %s: config_repo is required", path)
 	}
-
-	cfg := &RootConfig{
-		ConfigRepo: raw.ConfigRepo,
-		Excludes:   raw.Excludes,
-		Git:        raw.Git,
-	}
-
-	// Migrate deprecated top-level fields into the git section
-	if cfg.Git.BranchPrefix == "" && raw.BranchPrefix != "" {
-		cfg.Git.BranchPrefix = raw.BranchPrefix
-	}
-	if cfg.Git.PullRequest == "" && raw.CreatePR != nil {
-		if *raw.CreatePR {
-			cfg.Git.PullRequest = PullRequestGitHubCLI
-		} else {
-			cfg.Git.PullRequest = PullRequestNo
-		}
-	}
-
-	applyGitDefaults(&cfg.Git)
-
 	if err := validateGitConfig(&cfg.Git); err != nil {
 		return nil, fmt.Errorf("root config %s: %w", path, err)
 	}
 
-	return cfg, nil
+	return &cfg, nil
 }
 
-const (
-	// PullRequestNo disables pull request creation.
-	PullRequestNo = "NO"
-	// PullRequestGitHubCLI creates pull requests using the GitHub CLI.
-	PullRequestGitHubCLI = "GITHUB_CLI"
-)
-
-func applyGitDefaults(g *GitConfig) {
-	if g.BranchPrefix == "" {
-		g.BranchPrefix = "gitrepoforge/"
-	}
-	if g.CommitMessage == "" {
-		g.CommitMessage = "gitrepoforge: apply desired state"
-	}
-	if g.BootstrapCommitMessage == "" {
-		g.BootstrapCommitMessage = "gitrepoforge: bootstrap repo"
-	}
-	if g.Push == nil {
-		t := true
-		g.Push = &t
-	}
-	if g.Remote == "" {
-		g.Remote = "origin"
-	}
-	if g.PullRequest == "" {
+func (g *GitConfig) Normalize() {
+	if strings.TrimSpace(g.PullRequest) == "" {
 		g.PullRequest = PullRequestNo
+		return
 	}
-	if g.PRTitle == "" {
-		g.PRTitle = g.CommitMessage
-	}
-	if g.PRBody == "" {
-		g.PRBody = "Automated changes applied by gitrepoforge."
-	}
-	if g.BootstrapPRTitle == "" {
-		g.BootstrapPRTitle = g.BootstrapCommitMessage
-	}
-	if g.BootstrapPRBody == "" {
-		g.BootstrapPRBody = "Automated bootstrap by gitrepoforge."
-	}
-	if g.ReturnToOriginalBranch == nil {
-		t := true
-		g.ReturnToOriginalBranch = &t
-	}
+	g.PullRequest = strings.ToUpper(strings.TrimSpace(g.PullRequest))
+}
+
+func (g *GitConfig) GitOptionsSpecified() bool {
+	return g.CreateBranch ||
+		g.Commit ||
+		g.Push ||
+		g.ReturnToOriginalBranch ||
+		g.DeleteBranch ||
+		(strings.TrimSpace(g.PullRequest) != "" && strings.ToUpper(strings.TrimSpace(g.PullRequest)) != PullRequestNo)
+}
+
+func (g *GitConfig) BuildBranchName(values map[string]string) string {
+	return substituteGitPlaceholders(g.BranchName, values)
+}
+
+func (g *GitConfig) BuildCommitMessage(values map[string]string) string {
+	return substituteGitPlaceholders(g.CommitMessage, values)
 }
 
 func validateGitConfig(g *GitConfig) error {
-	pr := strings.ToUpper(g.PullRequest)
-	if pr != PullRequestNo && pr != PullRequestGitHubCLI {
-		return fmt.Errorf("git.pull_request must be %q or %q, got %q", PullRequestNo, PullRequestGitHubCLI, g.PullRequest)
-	}
-	g.PullRequest = pr
+	g.Normalize()
 
-	if !*g.Push && g.PullRequest == PullRequestGitHubCLI {
-		return fmt.Errorf("git.pull_request cannot be %q when git.push is false", PullRequestGitHubCLI)
+	if g.PullRequest != PullRequestNo && g.PullRequest != PullRequestGitHubCLI {
+		return fmt.Errorf("git.pull_request must be %q or %q", PullRequestNo, PullRequestGitHubCLI)
 	}
-	if g.DeleteBranch && !*g.ReturnToOriginalBranch {
+	if g.CreateBranch && strings.TrimSpace(g.BranchName) == "" {
+		return fmt.Errorf("git.branch_name is required when git.create_branch is true")
+	}
+	if g.Commit && strings.TrimSpace(g.CommitMessage) == "" {
+		return fmt.Errorf("git.commit_message is required when git.commit is true")
+	}
+	if g.Push && strings.TrimSpace(g.Remote) == "" {
+		return fmt.Errorf("git.remote is required when git.push is true")
+	}
+	if g.PullRequest == PullRequestGitHubCLI && !g.Push {
+		return fmt.Errorf("git.pull_request requires git.push to be true")
+	}
+	if g.ReturnToOriginalBranch && !g.CreateBranch {
+		return fmt.Errorf("git.return_to_original_branch requires git.create_branch to be true")
+	}
+	if g.DeleteBranch && !g.ReturnToOriginalBranch {
 		return fmt.Errorf("git.delete_branch requires git.return_to_original_branch to be true")
 	}
 	return nil

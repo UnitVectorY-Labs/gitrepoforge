@@ -48,27 +48,6 @@ func CreateBranch(repoPath, branch string) error {
 	return nil
 }
 
-// BranchExists checks if a branch exists locally.
-func BranchExists(repoPath, branch string) (bool, error) {
-	cmd := exec.Command("git", "rev-parse", "--verify", branch)
-	cmd.Dir = repoPath
-	if err := cmd.Run(); err != nil {
-		return false, nil
-	}
-	return true, nil
-}
-
-// RemoteBranchExists checks if a branch exists on the remote.
-func RemoteBranchExists(repoPath, branch string) (bool, error) {
-	cmd := exec.Command("git", "ls-remote", "--heads", "origin", branch)
-	cmd.Dir = repoPath
-	out, err := cmd.Output()
-	if err != nil {
-		return false, fmt.Errorf("git ls-remote failed: %w", err)
-	}
-	return strings.TrimSpace(string(out)) != "", nil
-}
-
 // AddAll stages all changes.
 func AddAll(repoPath string) error {
 	cmd := exec.Command("git", "add", "-A")
@@ -125,14 +104,9 @@ func HasChanges(repoPath string) (bool, error) {
 	return false, nil
 }
 
-// CreatePR uses gh CLI to create a pull request.
-func CreatePR(repoPath, branch, baseBranch, title, body string) error {
-	cmd := exec.Command("gh", "pr", "create",
-		"--base", baseBranch,
-		"--head", branch,
-		"--title", title,
-		"--body", body,
-	)
+// CreatePR uses gh CLI to create a pull request from the current branch.
+func CreatePR(repoPath string) error {
+	cmd := exec.Command("gh", "pr", "create", "--fill")
 	cmd.Dir = repoPath
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("gh pr create failed: %s: %w", string(out), err)

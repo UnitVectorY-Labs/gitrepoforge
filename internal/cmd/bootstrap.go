@@ -8,7 +8,6 @@ import (
 
 	"github.com/UnitVectorY-Labs/gitrepoforge/internal/config"
 	"github.com/UnitVectorY-Labs/gitrepoforge/internal/engine"
-	"github.com/UnitVectorY-Labs/gitrepoforge/internal/gitops"
 	"github.com/UnitVectorY-Labs/gitrepoforge/internal/output"
 	"github.com/UnitVectorY-Labs/gitrepoforge/internal/schema"
 )
@@ -51,7 +50,7 @@ func runBootstrap(version string, args []string) {
 		fmt.Println()
 	}
 
-	result := bootstrapRepo(repoPath, *repoFlag, rootCfg, centralCfg, configRepoPath)
+	result := bootstrapRepo(repoPath, *repoFlag, rootCfg, centralCfg)
 	report.Repos = append(report.Repos, result)
 
 	if *jsonFlag {
@@ -65,7 +64,7 @@ func runBootstrap(version string, args []string) {
 	}
 }
 
-func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg *config.CentralConfig, configRepoPath string) output.RepoResult {
+func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg *config.CentralConfig) output.RepoResult {
 	if !config.RepoConfigExists(repoPath) {
 		return output.RepoResult{
 			Name:             repoName,
@@ -96,20 +95,11 @@ func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centra
 		}
 	}
 
-	// Check repo is clean
-	clean, err := gitops.IsClean(repoPath)
-	if err != nil {
+	if gitValidationErrors := validateRootGitTemplates(rootCfg, repoCfg); len(gitValidationErrors) > 0 {
 		return output.RepoResult{
 			Name:             repoName,
-			Status:           "failed",
-			ValidationErrors: []string{fmt.Sprintf("failed to check repo status: %v", err)},
-		}
-	}
-	if !clean {
-		return output.RepoResult{
-			Name:             repoName,
-			Status:           "failed",
-			ValidationErrors: []string{"repo has uncommitted changes; bootstrap requires a clean working tree"},
+			Status:           "invalid",
+			ValidationErrors: gitValidationErrors,
 		}
 	}
 
@@ -129,120 +119,5 @@ func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centra
 		}
 	}
 
-	// Bootstrap uses a distinct branch name
-	branchName := rootCfg.Git.BranchPrefix + "bootstrap"
-
-	// Checkout default branch first
-	if err := gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch); err != nil {
-		return output.RepoResult{
-			Name:             repoName,
-			Status:           "failed",
-			ValidationErrors: []string{fmt.Sprintf("failed to checkout default branch: %v", err)},
-		}
-	}
-
-	// Create branch
-	if err := gitops.CreateBranch(repoPath, branchName); err != nil {
-		return output.RepoResult{
-			Name:             repoName,
-			Status:           "failed",
-			ValidationErrors: []string{fmt.Sprintf("failed to create branch: %v", err)},
-		}
-	}
-
-	// Apply changes
-	if err := engine.ApplyFindings(findings, repoPath); err != nil {
-		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
-		return output.RepoResult{
-			Name:             repoName,
-			Status:           "failed",
-			ValidationErrors: []string{fmt.Sprintf("failed to apply changes: %v", err)},
-		}
-	}
-
-	// Stage and commit
-	if err := gitops.AddAll(repoPath); err != nil {
-		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
-		return output.RepoResult{
-			Name:             repoName,
-			Status:           "failed",
-			ValidationErrors: []string{fmt.Sprintf("failed to stage changes: %v", err)},
-		}
-	}
-
-	hasChanges, err := gitops.HasChanges(repoPath)
-	if err != nil {
-		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
-		return output.RepoResult{
-			Name:             repoName,
-			Status:           "failed",
-			ValidationErrors: []string{fmt.Sprintf("failed to check for changes: %v", err)},
-		}
-	}
-
-	if !hasChanges {
-		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
-		return output.RepoResult{
-			Name:   repoName,
-			Status: "clean",
-		}
-	}
-
-	if err := gitops.Commit(repoPath, rootCfg.Git.BootstrapCommitMessage); err != nil {
-		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
-		return output.RepoResult{
-			Name:             repoName,
-			Status:           "failed",
-			ValidationErrors: []string{fmt.Sprintf("failed to commit: %v", err)},
-		}
-	}
-
-	// Push if configured
-	if *rootCfg.Git.Push {
-		if err := gitops.Push(repoPath, rootCfg.Git.Remote, branchName); err != nil {
-			gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
-			return output.RepoResult{
-				Name:             repoName,
-				Status:           "failed",
-				ValidationErrors: []string{fmt.Sprintf("failed to push: %v", err)},
-			}
-		}
-
-		// Create PR if configured
-		if rootCfg.Git.PullRequest == config.PullRequestGitHubCLI {
-			err := gitops.CreatePR(repoPath, branchName, repoCfg.DefaultBranch,
-				rootCfg.Git.BootstrapPRTitle,
-				rootCfg.Git.BootstrapPRBody)
-			if err != nil {
-				output.Warning(fmt.Sprintf("%s: PR creation failed: %v", repoName, err))
-			}
-		}
-	}
-
-	// Return to original branch if configured
-	if *rootCfg.Git.ReturnToOriginalBranch {
-		gitops.CheckoutBranch(repoPath, repoCfg.DefaultBranch)
-
-		// Delete the branch if configured
-		if rootCfg.Git.DeleteBranch {
-			if err := gitops.DeleteBranch(repoPath, branchName); err != nil {
-				output.Warning(fmt.Sprintf("%s: failed to delete branch %s: %v", repoName, branchName, err))
-			}
-		}
-	}
-
-	var findingOutputs []output.FindingOutput
-	for _, f := range findings {
-		findingOutputs = append(findingOutputs, output.FindingOutput{
-			FilePath:  f.FilePath,
-			Operation: f.Operation,
-			Message:   f.Message,
-		})
-	}
-
-	return output.RepoResult{
-		Name:     repoName,
-		Status:   "applied",
-		Findings: findingOutputs,
-	}
+	return applyFindingsWithGit(repoPath, repoName, repoCfg, rootCfg, findings)
 }

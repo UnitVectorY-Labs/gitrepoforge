@@ -10,7 +10,7 @@ When managing many repositories, it is common to need consistent files such as l
 
 ```
 workspace/
-├── .gitrepoforge-config        # Root config — points to the config repo
+├── .gitrepoforge-config        # Root config — points to the config repo and shared Git automation
 ├── config-repo/
 │   ├── config/                 # Config definitions — one YAML file per key
 │   │   └── license.yaml
@@ -42,14 +42,14 @@ workspace/
 1. **Load** the root config (`.gitrepoforge-config`) and config repo (`config/`, `outputs/`, `templates/`).
 2. **Discover** Git repos in the workspace, excluding patterns from the root config.
 3. For each repo that has a `.gitrepoforge` file:
-   - **Validate** repo config values and the repo's default branch against the shared schema.
+   - **Validate** repo metadata and config values against the shared schema.
    - **Compute findings** by selecting a matching template and comparing the rendered file to disk.
-4. **Report** findings (`validate`) or **apply** them via Git operations (`apply` / `bootstrap`).
+4. **Report** findings (`validate`) or **apply** them, optionally followed by root-configured Git operations (`apply` / `bootstrap`).
 
 ### Commands
 
 - **`validate`** — Dry-run audit. Reports drift without making changes.
-- **`apply`** — Applies the desired state, creating a branch, committing, pushing, and optionally opening a PR.
-- **`bootstrap`** — Like apply, but intended for first-time setup of a repo.
+- **`apply`** — Applies the desired state and, when configured, runs shared Git automation.
+- **`bootstrap`** — Like apply, but targeted to a single repo for first-time setup.
 
 See [commands.md](commands.md) for full details.

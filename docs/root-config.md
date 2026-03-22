@@ -9,18 +9,15 @@ config_repo: config-repo
 excludes:
   - archived-*
 git:
-  branch_prefix: gitrepoforge/
-  commit_message: "gitrepoforge: apply desired state"
-  bootstrap_commit_message: "gitrepoforge: bootstrap repo"
+  create_branch: true
+  branch_name: "gitrepoforge/{{name}}"
+  commit: true
+  commit_message: "gitrepoforge: apply desired state for {{name}}"
   push: true
   remote: origin
   pull_request: GITHUB_CLI
-  pr_title: "gitrepoforge: apply desired state"
-  pr_body: "Automated changes applied by gitrepoforge."
-  bootstrap_pr_title: "gitrepoforge: bootstrap repo"
-  bootstrap_pr_body: "Automated bootstrap by gitrepoforge."
   return_to_original_branch: true
-  delete_branch: false
+  delete_branch: true
 ```
 
 ## Fields
@@ -33,45 +30,39 @@ git:
 
 ## Git Section
 
-The `git` section controls how `apply` and `bootstrap` interact with Git. All fields are optional and have sensible defaults.
+The `git` section controls how `apply` and `bootstrap` interact with Git across the workspace. Its shape intentionally mirrors the repver Git config, but it is defined once in `.gitrepoforge-config` and applied to each managed repository.
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `branch_prefix` | `gitrepoforge/` | Prefix for branches created by `apply` and `bootstrap`. The suffix `update` or `bootstrap` is appended automatically. |
-| `commit_message` | `gitrepoforge: apply desired state` | Commit message used by `apply`. |
-| `bootstrap_commit_message` | `gitrepoforge: bootstrap repo` | Commit message used by `bootstrap`. |
-| `push` | `true` | Push the branch to the remote after committing. |
-| `remote` | `origin` | Git remote to push to. |
-| `pull_request` | `NO` | Pull request creation method. `NO` disables PR creation. `GITHUB_CLI` creates a PR using the `gh` CLI. |
-| `pr_title` | value of `commit_message` | Title for pull requests opened by `apply`. |
-| `pr_body` | `Automated changes applied by gitrepoforge.` | Body for pull requests opened by `apply`. |
-| `bootstrap_pr_title` | value of `bootstrap_commit_message` | Title for pull requests opened by `bootstrap`. |
-| `bootstrap_pr_body` | `Automated bootstrap by gitrepoforge.` | Body for pull requests opened by `bootstrap`. |
-| `return_to_original_branch` | `true` | Check out back to the default branch after pushing. |
-| `delete_branch` | `false` | Delete the local branch after returning to the original branch. Requires `return_to_original_branch` to be `true`. |
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `create_branch` | boolean | No | Create a new branch before making changes. |
+| `branch_name` | string | Yes* | Name for the new branch. Supports `{{param}}` placeholders. *Required if `create_branch` is true. |
+| `commit` | boolean | No | Commit the changes after modification. |
+| `commit_message` | string | Yes* | Commit message. Supports `{{param}}` placeholders. *Required if `commit` is true. |
+| `push` | boolean | No | Push the branch to the remote repository. |
+| `remote` | string | Yes* | Git remote name (for example `origin`). *Required if `push` is true. |
+| `pull_request` | string | No | Create a pull request. Values: `NO` (default), `GITHUB_CLI`. |
+| `return_to_original_branch` | boolean | No | Switch back to the original branch after operations. Requires `create_branch` to be true. |
+| `delete_branch` | boolean | No | Delete the new branch locally after operations. Requires `return_to_original_branch` to be true. |
+
+### Placeholder Values
+
+`branch_name` and `commit_message` may use `{{param}}` placeholders. In gitrepoforge those placeholders are resolved from the target repo's `.gitrepoforge` values:
+
+- `name`
+- `default_branch`
+- Any key under `config:`
 
 ### Validation Rules
 
 - `pull_request` must be `NO` or `GITHUB_CLI` (case-insensitive).
-- `pull_request` cannot be `GITHUB_CLI` when `push` is `false`.
+- `branch_name` is required when `create_branch` is `true`.
+- `commit_message` is required when `commit` is `true`.
+- `remote` is required when `push` is `true`.
+- `pull_request` requires `push` to be `true`.
+- `return_to_original_branch` requires `create_branch` to be `true`.
 - `delete_branch` requires `return_to_original_branch` to be `true`.
+- Unknown placeholders in `branch_name` or `commit_message` are rejected for the affected repo.
 
-## Backward Compatibility
+### Removed Fields
 
-The legacy top-level fields `branch_prefix` and `create_pr` are still accepted for backward compatibility. If both a legacy field and the corresponding `git` section field are present, the `git` section takes precedence.
-
-| Legacy field | Equivalent `git` field |
-|--------------|----------------------|
-| `branch_prefix` | `git.branch_prefix` |
-| `create_pr: true` | `git.pull_request: GITHUB_CLI` |
-| `create_pr: false` | `git.pull_request: NO` |
-
-### Legacy example
-
-```yaml
-config_repo: config-repo
-excludes:
-  - archived-*
-branch_prefix: gitrepoforge/
-create_pr: false
-```
+The old Git fields and compatibility aliases are no longer supported. In particular, `branch_prefix`, `create_pr`, `bootstrap_commit_message`, `pr_title`, `pr_body`, `bootstrap_pr_title`, and `bootstrap_pr_body` are invalid.
