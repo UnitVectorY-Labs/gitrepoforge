@@ -1,0 +1,5 @@
+templates:
+  - condition: exists docs.domain
+    template: docs/CNAME.tmpl
+    evaluate: true
+  - absent: true

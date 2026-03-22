@@ -134,7 +134,7 @@ templates:
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `condition` | no | Boolean selector for the candidate. Empty means always matches, which is useful for a fallthrough entry. |
+| `condition` | no | Boolean selector for the candidate. Empty means always matches, which is useful for a fallthrough entry. Supported forms are documented in [Condition Syntax](/Users/jaredhatfield/github/gitrepoforge/docs/conditions.md). |
 | `template` | yes unless `absent` is true | Path to a file under `templates/`. |
 | `evaluate` | no | If true, render the template file with template data. If false or omitted, copy the file verbatim. |
 | `absent` | no | If true, the selected result is that the target file must not exist. |
@@ -203,6 +203,30 @@ templates:
     evaluate: true
   - absent: true
 ```
+
+Use `exists` when selection should depend on whether a repo explicitly set a value rather than whether a default resolved value is available:
+
+```yaml
+templates:
+  - condition: exists docs.domain
+    template: docs/CNAME.tmpl
+    evaluate: true
+  - absent: true
+```
+
+`exists docs.domain` only matches when `config.docs.domain` is present in the repo's `.gitrepoforge` file. It does not match a value that only came from a schema default.
+
+Conditions can also be combined with `&&` and `||`:
+
+```yaml
+templates:
+  - condition: docs.enabled && exists docs.domain
+    template: docs/CNAME.tmpl
+    evaluate: true
+  - absent: true
+```
+
+Use parentheses when grouping is needed, for example `(docs.enabled || preview_docs) && exists docs.domain`.
 
 `mode: delete` is still available when a file is always forbidden and does not need conditional selection.
 

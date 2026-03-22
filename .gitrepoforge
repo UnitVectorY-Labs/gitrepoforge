@@ -1,6 +1,10 @@
 name: gitrepoforge
 default_branch: main
 config:
+  description: "Command line application to audit and apply standard file patterns to Git repos."
   license: MIT
   language: go
   justfile: true
+  docs:
+    enabled: true
+    domain: gitrepoforge.unitvectorylabs.com

@@ -1,0 +1,6 @@
+name: repo
+default_branch: main
+config:
+  docs:
+    enabled: true
+    domain: docs.example.com

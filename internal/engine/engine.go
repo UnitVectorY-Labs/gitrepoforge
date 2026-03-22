@@ -23,22 +23,25 @@ type Finding struct {
 
 // TemplateData is the data passed to template files for rendering.
 type TemplateData struct {
-	Name          string
-	DefaultBranch string
-	Config        map[string]interface{}
+	Name           string
+	DefaultBranch  string
+	Config         map[string]interface{}
+	providedConfig map[string]interface{}
 }
 
 // ComputeFindings computes the compliance findings for a repo.
 func ComputeFindings(repoCfg *config.RepoConfig, centralCfg *config.CentralConfig, repoPath string) ([]Finding, error) {
 	var findings []Finding
 
+	providedConfig := cloneConfigMap(repoCfg.Config)
 	config.ApplyConfigDefaults(repoCfg, centralCfg)
 	repoCfg.Config = config.ResolvedConfigValues(repoCfg, centralCfg)
 
 	data := TemplateData{
-		Name:          repoCfg.Name,
-		DefaultBranch: repoCfg.DefaultBranch,
-		Config:        repoCfg.Config,
+		Name:           repoCfg.Name,
+		DefaultBranch:  repoCfg.DefaultBranch,
+		Config:         repoCfg.Config,
+		providedConfig: providedConfig,
 	}
 
 	for _, rule := range centralCfg.Files {
@@ -150,7 +153,7 @@ func selectTemplate(rule config.FileRule, data TemplateData) (config.TemplateRef
 	}
 
 	for _, candidate := range rule.Templates {
-		matches, err := EvaluateCondition(candidate.Condition, data.Config)
+		matches, err := EvaluateCondition(candidate.Condition, data.Config, data.providedConfig)
 		if err != nil {
 			return config.TemplateRef{}, fmt.Errorf("invalid condition %q: %w", candidate.Condition, err)
 		}
@@ -204,10 +207,177 @@ func renderTemplateFile(path string, data TemplateData) (string, error) {
 
 // EvaluateCondition checks whether a template selector condition matches the
 // current repo config. Empty conditions always match.
-func EvaluateCondition(condition string, values map[string]interface{}) (bool, error) {
-	condition = strings.TrimSpace(condition)
-	if condition == "" {
+func EvaluateCondition(condition string, values, providedValues map[string]interface{}) (bool, error) {
+	parser := conditionParser{
+		input:          strings.TrimSpace(condition),
+		values:         values,
+		providedValues: providedValues,
+	}
+	if parser.input == "" {
 		return true, nil
+	}
+
+	result, err := parser.parseOr()
+	if err != nil {
+		return false, err
+	}
+	parser.skipWhitespace()
+	if !parser.done() {
+		return false, fmt.Errorf("unexpected token near %q", parser.input[parser.pos:])
+	}
+	return result, nil
+}
+
+type conditionParser struct {
+	input          string
+	pos            int
+	values         map[string]interface{}
+	providedValues map[string]interface{}
+}
+
+func (p *conditionParser) parseOr() (bool, error) {
+	left, err := p.parseAnd()
+	if err != nil {
+		return false, err
+	}
+
+	for {
+		p.skipWhitespace()
+		if !p.match("||") {
+			return left, nil
+		}
+
+		right, err := p.parseAnd()
+		if err != nil {
+			return false, err
+		}
+		left = left || right
+	}
+}
+
+func (p *conditionParser) parseAnd() (bool, error) {
+	left, err := p.parsePrimary()
+	if err != nil {
+		return false, err
+	}
+
+	for {
+		p.skipWhitespace()
+		if !p.match("&&") {
+			return left, nil
+		}
+
+		right, err := p.parsePrimary()
+		if err != nil {
+			return false, err
+		}
+		left = left && right
+	}
+}
+
+func (p *conditionParser) parsePrimary() (bool, error) {
+	p.skipWhitespace()
+	if p.done() {
+		return false, fmt.Errorf("unexpected end of condition")
+	}
+
+	if p.match("(") {
+		result, err := p.parseOr()
+		if err != nil {
+			return false, err
+		}
+		p.skipWhitespace()
+		if !p.match(")") {
+			return false, fmt.Errorf("missing closing parenthesis")
+		}
+		return result, nil
+	}
+
+	atom := p.readAtom()
+	if atom == "" {
+		return false, fmt.Errorf("unexpected token near %q", p.input[p.pos:])
+	}
+	return evaluateSimpleCondition(atom, p.values, p.providedValues)
+}
+
+func (p *conditionParser) readAtom() string {
+	start := p.pos
+	var quote byte
+	for !p.done() {
+		ch := p.input[p.pos]
+		if quote != 0 {
+			p.pos++
+			if ch == '\\' && !p.done() {
+				p.pos++
+				continue
+			}
+			if ch == quote {
+				quote = 0
+			}
+			continue
+		}
+
+		switch ch {
+		case '"', '\'':
+			quote = ch
+			p.pos++
+		case '(':
+			if p.pos == start {
+				return ""
+			}
+			return strings.TrimSpace(p.input[start:p.pos])
+		case ')':
+			return strings.TrimSpace(p.input[start:p.pos])
+		case '&':
+			if strings.HasPrefix(p.input[p.pos:], "&&") {
+				return strings.TrimSpace(p.input[start:p.pos])
+			}
+			p.pos++
+		case '|':
+			if strings.HasPrefix(p.input[p.pos:], "||") {
+				return strings.TrimSpace(p.input[start:p.pos])
+			}
+			p.pos++
+		default:
+			p.pos++
+		}
+	}
+	return strings.TrimSpace(p.input[start:p.pos])
+}
+
+func (p *conditionParser) skipWhitespace() {
+	for !p.done() {
+		switch p.input[p.pos] {
+		case ' ', '\t', '\n', '\r':
+			p.pos++
+		default:
+			return
+		}
+	}
+}
+
+func (p *conditionParser) match(token string) bool {
+	if strings.HasPrefix(p.input[p.pos:], token) {
+		p.pos += len(token)
+		return true
+	}
+	return false
+}
+
+func (p *conditionParser) done() bool {
+	return p.pos >= len(p.input)
+}
+
+func evaluateSimpleCondition(condition string, values, providedValues map[string]interface{}) (bool, error) {
+	if key, negate, ok, err := parseExistsCondition(condition); ok {
+		if err != nil {
+			return false, err
+		}
+		_, exists := lookupConfigValue(key, providedValues)
+		if negate {
+			return !exists, nil
+		}
+		return exists, nil
 	}
 
 	if strings.HasPrefix(condition, "!") {
@@ -247,6 +417,26 @@ func EvaluateCondition(condition string, values map[string]interface{}) (bool, e
 	}
 
 	return evaluateBooleanKey(condition, values)
+}
+
+func parseExistsCondition(condition string) (key string, negate, ok bool, err error) {
+	switch {
+	case condition == "exists", condition == "!exists":
+		return "", false, true, fmt.Errorf("invalid exists condition %q", condition)
+	case strings.HasPrefix(condition, "exists "):
+		key = strings.TrimSpace(condition[len("exists "):])
+	case strings.HasPrefix(condition, "!exists "):
+		key = strings.TrimSpace(condition[len("!exists "):])
+		negate = true
+	default:
+		return "", false, false, nil
+	}
+
+	if !isValidConditionKey(key) {
+		return "", false, true, fmt.Errorf("invalid exists condition %q", condition)
+	}
+
+	return key, negate, true, nil
 }
 
 func evaluateBooleanKey(key string, values map[string]interface{}) (bool, error) {
@@ -301,4 +491,45 @@ var conditionKeyPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 
 func isValidConditionKey(key string) bool {
 	return conditionKeyPattern.MatchString(key)
+}
+
+func cloneConfigMap(values map[string]interface{}) map[string]interface{} {
+	if values == nil {
+		return nil
+	}
+
+	cloned, ok := cloneConfigValue(values).(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	return cloned
+}
+
+func cloneConfigValue(value interface{}) interface{} {
+	switch typed := value.(type) {
+	case map[string]interface{}:
+		result := make(map[string]interface{}, len(typed))
+		for key, nestedValue := range typed {
+			result[key] = cloneConfigValue(nestedValue)
+		}
+		return result
+	case map[interface{}]interface{}:
+		result := make(map[string]interface{}, len(typed))
+		for key, nestedValue := range typed {
+			keyName, ok := key.(string)
+			if !ok {
+				return value
+			}
+			result[keyName] = cloneConfigValue(nestedValue)
+		}
+		return result
+	case []interface{}:
+		result := make([]interface{}, len(typed))
+		for i := range typed {
+			result[i] = cloneConfigValue(typed[i])
+		}
+		return result
+	default:
+		return value
+	}
 }

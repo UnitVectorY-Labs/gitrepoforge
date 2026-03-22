@@ -249,6 +249,108 @@ func TestComputeFindingsMaterializesNestedDefaultsForOptionalObjects(t *testing.
 	}
 }
 
+func TestComputeFindingsExistsConditionUsesExplicitConfig(t *testing.T) {
+	configRepo := t.TempDir()
+	writeTestFile(t, configRepo, "templates/docs/CNAME.tmpl", `{{ .Config.docs.domain }}`)
+
+	centralCfg := &config.CentralConfig{
+		Definitions: []config.ConfigDefinition{
+			{
+				Name: "docs",
+				Type: "object",
+				Attributes: []config.ConfigDefinition{
+					{Name: "enabled", Type: "boolean", Default: true, HasDefault: true},
+					{Name: "domain", Type: "string", Default: "docs.default.example.com", HasDefault: true},
+				},
+			},
+		},
+		Files: []config.FileRule{
+			{
+				Path: "docs/CNAME",
+				Templates: []config.TemplateRef{
+					{
+						Condition:    "docs.enabled && exists docs.domain",
+						Template:     "docs/CNAME.tmpl",
+						Evaluate:     true,
+						ResolvedPath: filepath.Join(configRepo, "templates", "docs", "CNAME.tmpl"),
+					},
+					{
+						Absent: true,
+					},
+				},
+			},
+		},
+	}
+
+	t.Run("defaulted value does not count as existing", func(t *testing.T) {
+		repoCfg := &config.RepoConfig{
+			Name:          "example-repo",
+			DefaultBranch: "main",
+		}
+
+		findings, err := ComputeFindings(repoCfg, centralCfg, t.TempDir())
+		if err != nil {
+			t.Fatalf("ComputeFindings returned error: %v", err)
+		}
+		if len(findings) != 0 {
+			t.Fatalf("expected 0 findings, got %d", len(findings))
+		}
+
+		docs, ok := repoCfg.Config["docs"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("Config[docs] has unexpected type %T", repoCfg.Config["docs"])
+		}
+		if docs["domain"] != "docs.default.example.com" {
+			t.Fatalf("Config[docs][domain] = %v, want %q", docs["domain"], "docs.default.example.com")
+		}
+	})
+
+	t.Run("explicit value counts as existing", func(t *testing.T) {
+		repoCfg := &config.RepoConfig{
+			Name:          "example-repo",
+			DefaultBranch: "main",
+			Config: map[string]interface{}{
+				"docs": map[string]interface{}{
+					"enabled": true,
+					"domain":  "docs.example.com",
+				},
+			},
+		}
+
+		findings, err := ComputeFindings(repoCfg, centralCfg, t.TempDir())
+		if err != nil {
+			t.Fatalf("ComputeFindings returned error: %v", err)
+		}
+		if len(findings) != 1 {
+			t.Fatalf("expected 1 finding, got %d", len(findings))
+		}
+		if findings[0].Expected != "docs.example.com" {
+			t.Fatalf("Expected = %q, want %q", findings[0].Expected, "docs.example.com")
+		}
+	})
+
+	t.Run("explicit value does not match when boolean condition is false", func(t *testing.T) {
+		repoCfg := &config.RepoConfig{
+			Name:          "example-repo",
+			DefaultBranch: "main",
+			Config: map[string]interface{}{
+				"docs": map[string]interface{}{
+					"enabled": false,
+					"domain":  "docs.example.com",
+				},
+			},
+		}
+
+		findings, err := ComputeFindings(repoCfg, centralCfg, t.TempDir())
+		if err != nil {
+			t.Fatalf("ComputeFindings returned error: %v", err)
+		}
+		if len(findings) != 0 {
+			t.Fatalf("expected 0 findings, got %d", len(findings))
+		}
+	})
+}
+
 func TestComputeFindingsDeletesFileWhenAbsentCandidateMatches(t *testing.T) {
 	configRepo := t.TempDir()
 	writeTestFile(t, configRepo, "templates/justfile.tmpl", "ignored")
@@ -319,11 +421,12 @@ func TestApplyFindings(t *testing.T) {
 
 func TestEvaluateCondition(t *testing.T) {
 	tests := []struct {
-		name      string
-		condition string
-		values    map[string]interface{}
-		want      bool
-		wantErr   bool
+		name           string
+		condition      string
+		values         map[string]interface{}
+		providedValues map[string]interface{}
+		want           bool
+		wantErr        bool
 	}{
 		{name: "empty condition matches", condition: "", want: true},
 		{name: "boolean key true", condition: "enabled", values: map[string]interface{}{"enabled": true}, want: true},
@@ -332,13 +435,24 @@ func TestEvaluateCondition(t *testing.T) {
 		{name: "string inequality", condition: `license != "apache-2.0"`, values: map[string]interface{}{"license": "mit"}, want: true},
 		{name: "nested boolean key", condition: "docs.enabled", values: map[string]interface{}{"docs": map[string]interface{}{"enabled": true}}, want: true},
 		{name: "nested string equality", condition: `docs.domain == "foo.example.com"`, values: map[string]interface{}{"docs": map[string]interface{}{"domain": "foo.example.com"}}, want: true},
+		{name: "exists key present", condition: "exists docs.domain", providedValues: map[string]interface{}{"docs": map[string]interface{}{"domain": "foo.example.com"}}, want: true},
+		{name: "exists key missing", condition: "exists docs.domain", providedValues: map[string]interface{}{}, want: false},
+		{name: "not exists key missing", condition: "!exists docs.domain", providedValues: map[string]interface{}{}, want: true},
+		{name: "exists ignores defaulted value", condition: "exists docs.domain", values: map[string]interface{}{"docs": map[string]interface{}{"domain": "default.example.com"}}, providedValues: map[string]interface{}{}, want: false},
+		{name: "and expression", condition: "docs.enabled && exists docs.domain", values: map[string]interface{}{"docs": map[string]interface{}{"enabled": true}}, providedValues: map[string]interface{}{"docs": map[string]interface{}{"domain": "foo.example.com"}}, want: true},
+		{name: "and expression false", condition: "docs.enabled && exists docs.domain", values: map[string]interface{}{"docs": map[string]interface{}{"enabled": false}}, providedValues: map[string]interface{}{"docs": map[string]interface{}{"domain": "foo.example.com"}}, want: false},
+		{name: "or expression", condition: "docs.enabled || exists docs.domain", values: map[string]interface{}{"docs": map[string]interface{}{"enabled": false}}, providedValues: map[string]interface{}{"docs": map[string]interface{}{"domain": "foo.example.com"}}, want: true},
+		{name: "operator precedence", condition: "enabled || other && exists docs.domain", values: map[string]interface{}{"enabled": false, "other": true}, providedValues: map[string]interface{}{"docs": map[string]interface{}{"domain": "foo.example.com"}}, want: true},
+		{name: "grouped expression", condition: "(enabled || other) && exists docs.domain", values: map[string]interface{}{"enabled": false, "other": true}, providedValues: map[string]interface{}{"docs": map[string]interface{}{"domain": "foo.example.com"}}, want: true},
 		{name: "missing key equality", condition: `license == "mit"`, values: map[string]interface{}{}, want: false},
 		{name: "bare non boolean is invalid", condition: "license", values: map[string]interface{}{"license": "mit"}, wantErr: true},
+		{name: "invalid exists condition", condition: "exists", wantErr: true},
+		{name: "missing closing parenthesis", condition: "(enabled && exists docs.domain", values: map[string]interface{}{"enabled": true}, providedValues: map[string]interface{}{"docs": map[string]interface{}{"domain": "foo.example.com"}}, wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := EvaluateCondition(tt.condition, tt.values)
+			got, err := EvaluateCondition(tt.condition, tt.values, tt.providedValues)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
