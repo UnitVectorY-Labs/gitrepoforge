@@ -271,8 +271,19 @@ func lookupConfigValue(key string, values map[string]interface{}) (interface{}, 
 	if values == nil {
 		return nil, false
 	}
-	value, ok := values[key]
-	return value, ok
+	current := interface{}(values)
+	for _, part := range strings.Split(key, ".") {
+		nested, ok := current.(map[string]interface{})
+		if !ok {
+			return nil, false
+		}
+		value, exists := nested[part]
+		if !exists {
+			return nil, false
+		}
+		current = value
+	}
+	return current, true
 }
 
 func parseConditionValue(raw string) string {

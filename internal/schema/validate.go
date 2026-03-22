@@ -42,61 +42,71 @@ func ValidateRepoConfig(repoCfg *config.RepoConfig, centralCfg *config.CentralCo
 		errors = append(errors, ValidationError{Field: "default_branch", Message: "default_branch is required"})
 	}
 
-	allowedConfig := make(map[string]*config.ConfigDefinition)
-	for i := range centralCfg.Definitions {
-		allowedConfig[centralCfg.Definitions[i].Name] = &centralCfg.Definitions[i]
+	errors = append(errors, validateConfigMap("config", repoCfg.Config, centralCfg.Definitions, true)...)
+
+	return errors
+}
+
+func validateConfigMap(field string, values map[string]interface{}, definitions []config.ConfigDefinition, topLevel bool) []ValidationError {
+	var errors []ValidationError
+
+	allowedConfig := make(map[string]*config.ConfigDefinition, len(definitions))
+	for i := range definitions {
+		allowedConfig[definitions[i].Name] = &definitions[i]
 	}
 
-	for _, def := range centralCfg.Definitions {
-		if def.Required {
-			if repoCfg.Config == nil {
-				errors = append(errors, ValidationError{
-					Field:   fmt.Sprintf("config.%s", def.Name),
-					Message: "required config value is missing",
-				})
-			} else if _, ok := repoCfg.Config[def.Name]; !ok {
-				errors = append(errors, ValidationError{
-					Field:   fmt.Sprintf("config.%s", def.Name),
-					Message: "required config value is missing",
-				})
-			}
+	for _, def := range definitions {
+		if !def.Required {
+			continue
+		}
+		if values == nil {
+			errors = append(errors, ValidationError{
+				Field:   fmt.Sprintf("%s.%s", field, def.Name),
+				Message: "required config value is missing",
+			})
+			continue
+		}
+		if _, ok := values[def.Name]; !ok {
+			errors = append(errors, ValidationError{
+				Field:   fmt.Sprintf("%s.%s", field, def.Name),
+				Message: "required config value is missing",
+			})
 		}
 	}
 
-	if repoCfg.Config != nil {
-		for key := range repoCfg.Config {
-			if config.IsReservedConfigName(key) {
-				errors = append(errors, ValidationError{
-					Field:   fmt.Sprintf("config.%s", key),
-					Message: "reserved top-level field name cannot be used in config",
-				})
-				continue
-			}
-			if _, ok := allowedConfig[key]; !ok {
-				errors = append(errors, ValidationError{
-					Field:   fmt.Sprintf("config.%s", key),
-					Message: "unknown config value",
-				})
-			}
+	if values == nil {
+		return errors
+	}
+
+	for key := range values {
+		if topLevel && config.IsReservedConfigName(key) {
+			errors = append(errors, ValidationError{
+				Field:   fmt.Sprintf("%s.%s", field, key),
+				Message: "reserved top-level field name cannot be used in config",
+			})
+			continue
+		}
+		if _, ok := allowedConfig[key]; !ok {
+			errors = append(errors, ValidationError{
+				Field:   fmt.Sprintf("%s.%s", field, key),
+				Message: "unknown config value",
+			})
 		}
 	}
 
-	if repoCfg.Config != nil {
-		for key, val := range repoCfg.Config {
-			def, ok := allowedConfig[key]
-			if !ok {
-				continue
-			}
-			errors = append(errors, validateConfigValue(key, val, def)...)
+	for key, val := range values {
+		def, ok := allowedConfig[key]
+		if !ok {
+			continue
 		}
+		errors = append(errors, validateConfigValue(fmt.Sprintf("%s.%s", field, key), val, def)...)
 	}
 
 	return errors
 }
 
-func validateConfigValue(name string, val interface{}, def *config.ConfigDefinition) []ValidationError {
+func validateConfigValue(field string, val interface{}, def *config.ConfigDefinition) []ValidationError {
 	var errors []ValidationError
-	field := fmt.Sprintf("config.%s", name)
 
 	switch def.Type {
 	case "string":
@@ -135,9 +145,35 @@ func validateConfigValue(name string, val interface{}, def *config.ConfigDefinit
 		if _, ok := val.([]interface{}); !ok {
 			errors = append(errors, ValidationError{Field: field, Message: "expected list value"})
 		}
+	case "object":
+		objectVal, ok := asConfigMap(val)
+		if !ok {
+			errors = append(errors, ValidationError{Field: field, Message: "expected object value"})
+			return errors
+		}
+		errors = append(errors, validateConfigMap(field, objectVal, def.Attributes, false)...)
 	default:
 		errors = append(errors, ValidationError{Field: field, Message: fmt.Sprintf("unsupported config type %q", def.Type)})
 	}
 
 	return errors
+}
+
+func asConfigMap(value interface{}) (map[string]interface{}, bool) {
+	switch typed := value.(type) {
+	case map[string]interface{}:
+		return typed, true
+	case map[interface{}]interface{}:
+		result := make(map[string]interface{}, len(typed))
+		for key, nestedValue := range typed {
+			keyName, ok := key.(string)
+			if !ok {
+				return nil, false
+			}
+			result[keyName] = nestedValue
+		}
+		return result, true
+	default:
+		return nil, false
+	}
 }

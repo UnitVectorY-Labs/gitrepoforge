@@ -145,3 +145,98 @@ func TestValidateRepoConfig(t *testing.T) {
 		}
 	})
 }
+
+func TestValidateRepoConfigNestedObject(t *testing.T) {
+	centralCfg := &config.CentralConfig{
+		Definitions: []config.ConfigDefinition{
+			{
+				Name:     "docs",
+				Type:     "object",
+				Required: true,
+				Attributes: []config.ConfigDefinition{
+					{Name: "enabled", Type: "boolean", Default: true, HasDefault: true},
+					{Name: "domain", Type: "string", Required: true},
+				},
+			},
+		},
+	}
+
+	t.Run("valid nested object", func(t *testing.T) {
+		repoCfg := &config.RepoConfig{
+			Name:          "example-repo",
+			DefaultBranch: "main",
+			Config: map[string]interface{}{
+				"docs": map[string]interface{}{
+					"domain": "foo.example.com",
+				},
+			},
+		}
+
+		errs := ValidateRepoConfig(repoCfg, centralCfg, filepath.Join(t.TempDir(), "example-repo"))
+		if len(errs) != 0 {
+			t.Fatalf("expected no validation errors, got %v", errs)
+		}
+
+		docs := repoCfg.Config["docs"].(map[string]interface{})
+		if docs["enabled"] != true {
+			t.Fatalf("Config[docs][enabled] = %v, want true", docs["enabled"])
+		}
+	})
+
+	t.Run("missing required nested field", func(t *testing.T) {
+		repoCfg := &config.RepoConfig{
+			Name:          "example-repo",
+			DefaultBranch: "main",
+			Config: map[string]interface{}{
+				"docs": map[string]interface{}{},
+			},
+		}
+
+		errs := ValidateRepoConfig(repoCfg, centralCfg, filepath.Join(t.TempDir(), "example-repo"))
+		if len(errs) != 1 {
+			t.Fatalf("expected 1 validation error, got %d: %v", len(errs), errs)
+		}
+		if errs[0].Field != "config.docs.domain" {
+			t.Fatalf("Field = %q, want %q", errs[0].Field, "config.docs.domain")
+		}
+	})
+
+	t.Run("unknown nested field", func(t *testing.T) {
+		repoCfg := &config.RepoConfig{
+			Name:          "example-repo",
+			DefaultBranch: "main",
+			Config: map[string]interface{}{
+				"docs": map[string]interface{}{
+					"domain": "foo.example.com",
+					"extra":  "nope",
+				},
+			},
+		}
+
+		errs := ValidateRepoConfig(repoCfg, centralCfg, filepath.Join(t.TempDir(), "example-repo"))
+		if len(errs) != 1 {
+			t.Fatalf("expected 1 validation error, got %d: %v", len(errs), errs)
+		}
+		if errs[0].Field != "config.docs.extra" {
+			t.Fatalf("Field = %q, want %q", errs[0].Field, "config.docs.extra")
+		}
+	})
+
+	t.Run("object value must be a map", func(t *testing.T) {
+		repoCfg := &config.RepoConfig{
+			Name:          "example-repo",
+			DefaultBranch: "main",
+			Config: map[string]interface{}{
+				"docs": true,
+			},
+		}
+
+		errs := ValidateRepoConfig(repoCfg, centralCfg, filepath.Join(t.TempDir(), "example-repo"))
+		if len(errs) != 1 {
+			t.Fatalf("expected 1 validation error, got %d: %v", len(errs), errs)
+		}
+		if errs[0].Field != "config.docs" {
+			t.Fatalf("Field = %q, want %q", errs[0].Field, "config.docs")
+		}
+	})
+}
