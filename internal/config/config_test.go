@@ -122,6 +122,61 @@ func TestLoadCentralConfigSupportsAbsentTemplateCandidate(t *testing.T) {
 	}
 }
 
+func TestLoadCentralConfigSupportsObjectDefinitions(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "config/docs.yaml", `type: object
+required: true
+description: Documentation settings.
+`)
+	writeFile(t, dir, "config/docs/enabled.yaml", `type: boolean
+default: true
+`)
+	writeFile(t, dir, "config/docs/domain.yaml", `type: string
+required: true
+`)
+
+	cfg, err := LoadCentralConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadCentralConfig returned error: %v", err)
+	}
+
+	if len(cfg.Definitions) != 1 {
+		t.Fatalf("Definitions length = %d, want 1", len(cfg.Definitions))
+	}
+	def := cfg.Definitions[0]
+	if def.Name != "docs" {
+		t.Fatalf("Definition name = %q, want %q", def.Name, "docs")
+	}
+	if def.Type != "object" {
+		t.Fatalf("Definition type = %q, want %q", def.Type, "object")
+	}
+	if len(def.Attributes) != 2 {
+		t.Fatalf("Attributes length = %d, want 2", len(def.Attributes))
+	}
+	if def.Attributes[0].Name != "domain" {
+		t.Fatalf("Attributes[0].Name = %q, want %q", def.Attributes[0].Name, "domain")
+	}
+	if def.Attributes[1].Name != "enabled" {
+		t.Fatalf("Attributes[1].Name = %q, want %q", def.Attributes[1].Name, "enabled")
+	}
+	if def.Attributes[1].Default != true {
+		t.Fatalf("Attributes[1].Default = %v, want true", def.Attributes[1].Default)
+	}
+}
+
+func TestLoadCentralConfigRejectsObjectDefinitionWithoutAttributeDirectory(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "config/docs.yaml", "type: object\n")
+
+	_, err := LoadCentralConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "object config definitions require an attribute directory") {
+		t.Fatalf("unexpected error %q", err)
+	}
+}
+
 func TestLoadCentralConfigSupportsUnconditionalTemplateCandidate(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "outputs/.github/workflows/add-to-project.yml.gitrepoforge", `templates:
@@ -184,6 +239,43 @@ func TestApplyConfigDefaults(t *testing.T) {
 	}
 	if repoCfg.Config["enabled"] != true {
 		t.Fatalf("Config[enabled] = %v, want true", repoCfg.Config["enabled"])
+	}
+}
+
+func TestApplyConfigDefaultsNestedObject(t *testing.T) {
+	repoCfg := &RepoConfig{
+		Name:          "example-repo",
+		DefaultBranch: "main",
+		Config: map[string]interface{}{
+			"docs": map[string]interface{}{
+				"domain": "foo.example.com",
+			},
+		},
+	}
+	centralCfg := &CentralConfig{
+		Definitions: []ConfigDefinition{
+			{
+				Name: "docs",
+				Type: "object",
+				Attributes: []ConfigDefinition{
+					{Name: "enabled", Type: "boolean", Default: true, HasDefault: true},
+					{Name: "domain", Type: "string", Required: true},
+				},
+			},
+		},
+	}
+
+	ApplyConfigDefaults(repoCfg, centralCfg)
+
+	docs, ok := repoCfg.Config["docs"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Config[docs] has unexpected type %T", repoCfg.Config["docs"])
+	}
+	if docs["enabled"] != true {
+		t.Fatalf("Config[docs][enabled] = %v, want true", docs["enabled"])
+	}
+	if docs["domain"] != "foo.example.com" {
+		t.Fatalf("Config[docs][domain] = %v, want %q", docs["domain"], "foo.example.com")
 	}
 }
 

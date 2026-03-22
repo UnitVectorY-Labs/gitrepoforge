@@ -1,0 +1,1 @@
+config.docs.domain: required config value is missing

@@ -9,7 +9,9 @@ name: my-repo
 default_branch: main
 config:
   license: mit
-  enable_license: true
+  docs:
+    enabled: true
+    domain: docs.example.com
 ```
 
 ## Fields
@@ -30,4 +32,5 @@ config:
 - The repo config does not contain a top-level `git` section; Git automation is configured only in `.gitrepoforge-config`.
 - Unknown config keys are rejected.
 - Values must match the declared type.
+- Object values must be YAML mappings, and nested keys are validated against the matching `config/<key>/` definitions from the config repo.
 - String values with `enum` must use one of the allowed values.

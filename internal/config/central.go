@@ -22,13 +22,14 @@ type CentralConfig struct {
 // ConfigDefinition defines a valid config value for per-repo configs.
 // Each definition is stored as its own file: config/<name>.yaml
 type ConfigDefinition struct {
-	Name        string      `yaml:"-"`
-	Type        string      `yaml:"type"`
-	Required    bool        `yaml:"required"`
-	Enum        []string    `yaml:"enum"`
-	Default     interface{} `yaml:"default"`
-	HasDefault  bool        `yaml:"-"`
-	Description string      `yaml:"description"`
+	Name        string             `yaml:"-"`
+	Type        string             `yaml:"type"`
+	Required    bool               `yaml:"required"`
+	Enum        []string           `yaml:"enum"`
+	Default     interface{}        `yaml:"default"`
+	HasDefault  bool               `yaml:"-"`
+	Description string             `yaml:"description"`
+	Attributes  []ConfigDefinition `yaml:"-"`
 }
 
 // FileRule defines how an output file is managed.
@@ -89,6 +90,10 @@ func LoadCentralConfig(configRepoPath string) (*CentralConfig, error) {
 // loadConfigDefinitions scans the config/ directory for YAML files.
 // Each file defines one config value; the filename (without .yaml) is the key.
 func loadConfigDefinitions(configDir string) ([]ConfigDefinition, error) {
+	return loadConfigDefinitionsFromDir(configDir, true)
+}
+
+func loadConfigDefinitionsFromDir(configDir string, topLevel bool) ([]ConfigDefinition, error) {
 	if _, err := os.Stat(configDir); os.IsNotExist(err) {
 		return nil, nil
 	}
@@ -116,7 +121,23 @@ func loadConfigDefinitions(configDir string) ([]ConfigDefinition, error) {
 			return nil, fmt.Errorf("failed to parse config file %s: %w", path, err)
 		}
 		def.Name = name
-		if err := validateDefinition(def); err != nil {
+		attributesDir := filepath.Join(configDir, name)
+		hasAttributesDir, err := directoryExists(attributesDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to inspect config attribute directory %s: %w", attributesDir, err)
+		}
+		if def.Type == "object" {
+			if !hasAttributesDir {
+				return nil, fmt.Errorf("invalid config file %s: object config definitions require an attribute directory at %s", path, attributesDir)
+			}
+			def.Attributes, err = loadConfigDefinitionsFromDir(attributesDir, false)
+			if err != nil {
+				return nil, err
+			}
+		} else if hasAttributesDir {
+			return nil, fmt.Errorf("invalid config file %s: only object config definitions may define nested attributes in %s", path, attributesDir)
+		}
+		if err := validateDefinition(def, topLevel); err != nil {
 			return nil, fmt.Errorf("invalid config file %s: %w", path, err)
 		}
 		definitions = append(definitions, def)
@@ -127,6 +148,17 @@ func loadConfigDefinitions(configDir string) ([]ConfigDefinition, error) {
 	})
 
 	return definitions, nil
+}
+
+func directoryExists(path string) (bool, error) {
+	info, err := os.Stat(path)
+	if err == nil {
+		return info.IsDir(), nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }
 
 // loadOutputRules walks the outputs/ directory tree for .gitrepoforge files.
@@ -247,12 +279,26 @@ func (d *ConfigDefinition) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-func validateDefinition(def ConfigDefinition) error {
-	if _, reserved := reservedConfigNames[def.Name]; reserved {
-		return fmt.Errorf("%q is reserved and cannot be used as a config key", def.Name)
+func validateDefinition(def ConfigDefinition, topLevel bool) error {
+	if topLevel {
+		if _, reserved := reservedConfigNames[def.Name]; reserved {
+			return fmt.Errorf("%q is reserved and cannot be used as a config key", def.Name)
+		}
+	}
+	if def.Name == "" {
+		return fmt.Errorf("name is required")
+	}
+	if strings.Contains(def.Name, ".") {
+		return fmt.Errorf("config key %q cannot contain dots", def.Name)
+	}
+	if strings.ContainsAny(def.Name, `/\`) {
+		return fmt.Errorf("config key %q cannot contain path separators", def.Name)
 	}
 	if def.Type == "" {
 		return fmt.Errorf("type is required")
+	}
+	if def.Type != "object" && len(def.Attributes) > 0 {
+		return fmt.Errorf("only object config definitions may define nested attributes")
 	}
 	if !def.HasDefault {
 		return nil
@@ -275,14 +321,76 @@ func ApplyConfigDefaults(repoCfg *RepoConfig, centralCfg *CentralConfig) {
 		repoCfg.Config = map[string]interface{}{}
 	}
 
-	for _, def := range centralCfg.Definitions {
-		if !def.HasDefault {
+	applyConfigDefaults(repoCfg.Config, centralCfg.Definitions)
+}
+
+func applyConfigDefaults(values map[string]interface{}, definitions []ConfigDefinition) {
+	for _, def := range definitions {
+		current, exists := values[def.Name]
+		if !exists {
+			if !def.HasDefault {
+				continue
+			}
+			values[def.Name] = cloneDefaultValue(def.Default)
+			current = values[def.Name]
+		}
+		if def.Type != "object" {
 			continue
 		}
-		if _, exists := repoCfg.Config[def.Name]; exists {
+		attributes, ok := AsConfigMap(current)
+		if !ok {
 			continue
 		}
-		repoCfg.Config[def.Name] = def.Default
+		applyConfigDefaults(attributes, def.Attributes)
+		values[def.Name] = attributes
+	}
+}
+
+func cloneDefaultValue(value interface{}) interface{} {
+	switch typed := value.(type) {
+	case map[string]interface{}:
+		result := make(map[string]interface{}, len(typed))
+		for key, nestedValue := range typed {
+			result[key] = cloneDefaultValue(nestedValue)
+		}
+		return result
+	case map[interface{}]interface{}:
+		result := make(map[string]interface{}, len(typed))
+		for key, nestedValue := range typed {
+			keyName, ok := key.(string)
+			if !ok {
+				return value
+			}
+			result[keyName] = cloneDefaultValue(nestedValue)
+		}
+		return result
+	case []interface{}:
+		result := make([]interface{}, len(typed))
+		for i := range typed {
+			result[i] = cloneDefaultValue(typed[i])
+		}
+		return result
+	default:
+		return value
+	}
+}
+
+func AsConfigMap(value interface{}) (map[string]interface{}, bool) {
+	switch typed := value.(type) {
+	case map[string]interface{}:
+		return typed, true
+	case map[interface{}]interface{}:
+		result := make(map[string]interface{}, len(typed))
+		for key, nestedValue := range typed {
+			keyName, ok := key.(string)
+			if !ok {
+				return nil, false
+			}
+			result[keyName] = nestedValue
+		}
+		return result, true
+	default:
+		return nil, false
 	}
 }
 
@@ -315,6 +423,10 @@ func validateDefaultValue(def ConfigDefinition) error {
 	case "list":
 		if _, ok := def.Default.([]interface{}); !ok {
 			return fmt.Errorf("default must be a list")
+		}
+	case "object":
+		if _, ok := AsConfigMap(def.Default); !ok {
+			return fmt.Errorf("default must be an object")
 		}
 	default:
 		return fmt.Errorf("unsupported config type %q", def.Type)

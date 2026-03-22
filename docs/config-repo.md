@@ -7,6 +7,10 @@ The config repo contains the shared definitions and file rules used across repos
 ```text
 config-repo/
 ├── config/
+│   ├── docs.yaml
+│   ├── docs/
+│   │   ├── domain.yaml
+│   │   └── enabled.yaml
 │   └── license.yaml
 ├── outputs/
 │   └── LICENSE.gitrepoforge
@@ -40,11 +44,37 @@ default: true
 description: Whether a LICENSE file should be managed.
 ```
 
+Object definitions can also declare nested attributes from a same-named folder.
+
+**`config/docs.yaml`**
+
+```yaml
+type: object
+required: true
+description: Documentation settings.
+```
+
+**`config/docs/enabled.yaml`**
+
+```yaml
+type: boolean
+default: true
+description: Whether documentation hosting is enabled.
+```
+
+**`config/docs/domain.yaml`**
+
+```yaml
+type: string
+required: true
+description: Canonical docs hostname.
+```
+
 ### Config Definition Fields
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `type` | yes | Supported values are `string`, `boolean`, `number`, and `list`. |
+| `type` | yes | Supported values are `string`, `boolean`, `number`, `list`, and `object`. |
 | `required` | no | If true, the repo must provide the key unless a `default` is defined. |
 | `default` | no | Typed default value used when the repo omits the key. |
 | `enum` | no | Allowed values for `string` definitions. |
@@ -56,6 +86,7 @@ description: Whether a LICENSE file should be managed.
 - `boolean` accepts `true` or `false`.
 - `number` accepts numeric YAML values.
 - `list` accepts YAML sequences.
+- `object` accepts YAML mappings. Nested attributes are loaded from `config/<key>/` using the same per-file format as top-level definitions.
 
 ### Reserved Config Keys
 
@@ -161,6 +192,16 @@ build:
 build:
   mvn package
 {{- end }}
+```
+
+Nested config values can also be referenced in conditions with dotted keys:
+
+```yaml
+templates:
+  - condition: docs.enabled
+    template: docs/CNAME.tmpl
+    evaluate: true
+  - absent: true
 ```
 
 `mode: delete` is still available when a file is always forbidden and does not need conditional selection.

@@ -274,6 +274,8 @@ func TestEvaluateCondition(t *testing.T) {
 		{name: "boolean key false", condition: "!enabled", values: map[string]interface{}{"enabled": false}, want: true},
 		{name: "string equality", condition: `license == "mit"`, values: map[string]interface{}{"license": "mit"}, want: true},
 		{name: "string inequality", condition: `license != "apache-2.0"`, values: map[string]interface{}{"license": "mit"}, want: true},
+		{name: "nested boolean key", condition: "docs.enabled", values: map[string]interface{}{"docs": map[string]interface{}{"enabled": true}}, want: true},
+		{name: "nested string equality", condition: `docs.domain == "foo.example.com"`, values: map[string]interface{}{"docs": map[string]interface{}{"domain": "foo.example.com"}}, want: true},
 		{name: "missing key equality", condition: `license == "mit"`, values: map[string]interface{}{}, want: false},
 		{name: "bare non boolean is invalid", condition: "license", values: map[string]interface{}{"license": "mit"}, wantErr: true},
 	}
