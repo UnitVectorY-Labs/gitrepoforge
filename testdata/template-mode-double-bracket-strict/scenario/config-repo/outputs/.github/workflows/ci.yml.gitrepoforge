@@ -1,0 +1,4 @@
+templates:
+  - template: .github/workflows/ci.yml.tmpl
+    evaluate: true
+    template_mode: DOUBLE_BRACKET_STRICT

@@ -137,6 +137,7 @@ templates:
 | `condition` | no | Boolean selector for the candidate. Empty means always matches, which is useful for a fallthrough entry. Supported forms are documented in [Condition Syntax](/Users/jaredhatfield/github/gitrepoforge/docs/conditions.md). |
 | `template` | yes unless `absent` is true | Path to a file under `templates/`. |
 | `evaluate` | no | If true, render the template file with template data. If false or omitted, copy the file verbatim. |
+| `template_mode` | no | Controls how template delimiters are recognized when `evaluate` is true. `DOUBLE_BRACKET` is the default. `DOUBLE_BRACKET_STRICT` only recognizes `{{` when it is at the start of the file or preceded by whitespace. |
 | `absent` | no | If true, the selected result is that the target file must not exist. |
 
 ### Selection Rules
@@ -174,6 +175,17 @@ templates:
     evaluate: true
   - absent: true
 ```
+
+Use strict delimiter matching when the file also contains other `{{ ... }}`-style syntax, such as GitHub Actions expressions:
+
+```yaml
+templates:
+  - template: .github/workflows/ci.yml.tmpl
+    evaluate: true
+    template_mode: DOUBLE_BRACKET_STRICT
+```
+
+With `DOUBLE_BRACKET_STRICT`, `${{ runner.os }}` remains literal because the `{{` is preceded by `$`, while template directives like `{{- if eq .Config.codecov true }}` still evaluate when they begin on their own lines.
 
 The evaluated template can branch on other config values internally:
 

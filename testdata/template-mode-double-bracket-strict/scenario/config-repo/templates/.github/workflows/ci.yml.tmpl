@@ -1,0 +1,11 @@
+name: ci
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache@v4
+        with:
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+{{- if eq .Config.codecov true }}
+      - uses: codecov/codecov-action@v4
+{{- end }}

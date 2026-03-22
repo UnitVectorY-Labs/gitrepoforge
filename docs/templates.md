@@ -38,6 +38,13 @@ This is appropriate for static license text or other files that should not execu
 
 If `evaluate: true` is set, gitrepoforge renders the file with Go's `text/template`.
 
+The optional `template_mode` field controls how template delimiters are recognized:
+
+| `template_mode` | Description |
+|-----------------|-------------|
+| `DOUBLE_BRACKET` | Default behavior. Any `{{ ... }}` sequence is treated as a Go template action. |
+| `DOUBLE_BRACKET_STRICT` | Only treats `{{ ... }}` as a Go template action when the `{{` appears at the start of the file or is immediately preceded by whitespace. |
+
 **`templates/justfile.tmpl`**
 
 ```text
@@ -68,3 +75,25 @@ templates:
 ```
 
 The `template` value is always a path relative to `templates/`.
+
+Use `DOUBLE_BRACKET_STRICT` when a file needs to preserve other `{{ ... }}`-style syntax such as GitHub Actions expressions:
+
+**`outputs/.github/workflows/ci.yml.gitrepoforge`**
+
+```yaml
+templates:
+  - template: .github/workflows/ci.yml.tmpl
+    evaluate: true
+    template_mode: DOUBLE_BRACKET_STRICT
+```
+
+**`templates/.github/workflows/ci.yml.tmpl`**
+
+```yaml
+key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+{{- if eq .Config.codecov true }}
+- uses: codecov/codecov-action@v4
+{{- end }}
+```
+
+In strict mode, the `${{ ... }}` expressions stay literal because the `{{` is preceded by `$`, while the control blocks still execute because they start on their own lines.

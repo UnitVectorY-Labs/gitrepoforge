@@ -193,6 +193,56 @@ build:
 	}
 }
 
+func TestComputeFindingsSupportsStrictDoubleBracketTemplateMode(t *testing.T) {
+	configRepo := t.TempDir()
+	writeTestFile(t, configRepo, "templates/.github/workflows/ci.yml.tmpl", `name: ci
+jobs:
+  test:
+    steps:
+      - uses: actions/cache@v4
+        with:
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+{{- if eq .Config.codecov true }}
+      - uses: codecov/codecov-action@v4
+{{- end }}
+`)
+
+	centralCfg := &config.CentralConfig{
+		Files: []config.FileRule{
+			{
+				Path: filepath.Join(".github", "workflows", "ci.yml"),
+				Templates: []config.TemplateRef{
+					{
+						Template:     filepath.Join(".github", "workflows", "ci.yml.tmpl"),
+						Evaluate:     true,
+						TemplateMode: config.TemplateModeDoubleBracketStrict,
+						ResolvedPath: filepath.Join(configRepo, "templates", ".github", "workflows", "ci.yml.tmpl"),
+					},
+				},
+			},
+		},
+	}
+	repoCfg := &config.RepoConfig{
+		Name:          "example-repo",
+		DefaultBranch: "main",
+		Config: map[string]interface{}{
+			"codecov": true,
+		},
+	}
+
+	findings, err := ComputeFindings(repoCfg, centralCfg, t.TempDir())
+	if err != nil {
+		t.Fatalf("ComputeFindings returned error: %v", err)
+	}
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(findings))
+	}
+	want := "name: ci\njobs:\n  test:\n    steps:\n      - uses: actions/cache@v4\n        with:\n          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}\n      - uses: codecov/codecov-action@v4\n"
+	if findings[0].Expected != want {
+		t.Fatalf("Expected = %q, want %q", findings[0].Expected, want)
+	}
+}
+
 func TestComputeFindingsMaterializesNestedDefaultsForOptionalObjects(t *testing.T) {
 	configRepo := t.TempDir()
 	writeTestFile(t, configRepo, "templates/docs/enabled.tmpl", `{{ .Config.docs.enabled }}`)

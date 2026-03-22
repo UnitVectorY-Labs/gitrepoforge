@@ -117,8 +117,31 @@ func TestLoadCentralConfigSupportsAbsentTemplateCandidate(t *testing.T) {
 	if !rule.Templates[0].Evaluate {
 		t.Fatalf("Evaluate = false, want true")
 	}
+	if rule.Templates[0].TemplateMode != TemplateModeDoubleBracket {
+		t.Fatalf("TemplateMode = %q, want %q", rule.Templates[0].TemplateMode, TemplateModeDoubleBracket)
+	}
 	if !rule.Templates[1].Absent {
 		t.Fatalf("Absent = false, want true")
+	}
+}
+
+func TestLoadCentralConfigSupportsStrictTemplateMode(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "outputs/.github/workflows/ci.yml.gitrepoforge", `templates:
+  - template: .github/workflows/ci.yml.tmpl
+    evaluate: true
+    template_mode: DOUBLE_BRACKET_STRICT
+`)
+	writeFile(t, dir, "templates/.github/workflows/ci.yml.tmpl", "name: ci\n")
+
+	cfg, err := LoadCentralConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadCentralConfig returned error: %v", err)
+	}
+
+	rule := cfg.Files[0]
+	if got := rule.Templates[0].TemplateMode; got != TemplateModeDoubleBracketStrict {
+		t.Fatalf("TemplateMode = %q, want %q", got, TemplateModeDoubleBracketStrict)
 	}
 }
 
@@ -337,6 +360,39 @@ func TestLoadCentralConfigRejectsAbsentTemplateWithTemplatePath(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	if !strings.Contains(err.Error(), "cannot also set template") {
+		t.Fatalf("unexpected error %q", err)
+	}
+}
+
+func TestLoadCentralConfigRejectsAbsentTemplateWithTemplateMode(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "outputs/justfile.gitrepoforge", `templates:
+  - absent: true
+    template_mode: DOUBLE_BRACKET_STRICT
+`)
+
+	_, err := LoadCentralConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "cannot set template_mode") {
+		t.Fatalf("unexpected error %q", err)
+	}
+}
+
+func TestLoadCentralConfigRejectsInvalidTemplateMode(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "outputs/justfile.gitrepoforge", `templates:
+  - template: justfile.tmpl
+    evaluate: true
+    template_mode: INVALID
+`)
+
+	_, err := LoadCentralConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "template_mode must be one of") {
 		t.Fatalf("unexpected error %q", err)
 	}
 }

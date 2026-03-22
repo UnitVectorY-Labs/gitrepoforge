@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/UnitVectorY-Labs/gitrepoforge/internal/config"
 )
@@ -174,14 +176,15 @@ func materializeTemplateFile(selected config.TemplateRef, data TemplateData) (st
 		return string(content), nil
 	}
 
-	return renderTemplateFile(selected.ResolvedPath, data)
+	return renderTemplateFile(selected.ResolvedPath, selected.TemplateMode, data)
 }
 
-func renderTemplateFile(path string, data TemplateData) (string, error) {
+func renderTemplateFile(path, templateMode string, data TemplateData) (string, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("failed to read template %s: %w", path, err)
 	}
+	preparedContent, placeholder := prepareTemplateContent(string(content), templateMode)
 
 	funcMap := template.FuncMap{
 		"getConfig": func(values map[string]interface{}, key string) interface{} {
@@ -192,7 +195,7 @@ func renderTemplateFile(path string, data TemplateData) (string, error) {
 		},
 	}
 
-	tmpl, err := template.New(filepath.Base(path)).Funcs(funcMap).Parse(string(content))
+	tmpl, err := template.New(filepath.Base(path)).Funcs(funcMap).Parse(preparedContent)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template %s: %w", path, err)
 	}
@@ -202,7 +205,66 @@ func renderTemplateFile(path string, data TemplateData) (string, error) {
 		return "", fmt.Errorf("failed to execute template %s: %w", path, err)
 	}
 
-	return buf.String(), nil
+	rendered := buf.String()
+	if placeholder != "" {
+		rendered = strings.ReplaceAll(rendered, placeholder, "{{")
+	}
+
+	return rendered, nil
+}
+
+func prepareTemplateContent(content, templateMode string) (string, string) {
+	switch config.TemplateModeOrDefault(templateMode) {
+	case config.TemplateModeDoubleBracketStrict:
+		placeholder := uniqueStrictModePlaceholder(content)
+		return escapeStrictModeDoubleBrackets(content, placeholder), placeholder
+	default:
+		return content, ""
+	}
+}
+
+func uniqueStrictModePlaceholder(content string) string {
+	placeholder := "__GITREPOFORGE_ESCAPED_DOUBLE_BRACKET__"
+	for strings.Contains(content, placeholder) {
+		placeholder += "_"
+	}
+	return placeholder
+}
+
+func escapeStrictModeDoubleBrackets(content, placeholder string) string {
+	if !strings.Contains(content, "{{") {
+		return content
+	}
+
+	var builder strings.Builder
+	builder.Grow(len(content))
+
+	offset := 0
+	for {
+		index := strings.Index(content[offset:], "{{")
+		if index == -1 {
+			builder.WriteString(content[offset:])
+			return builder.String()
+		}
+
+		index += offset
+		builder.WriteString(content[offset:index])
+		if hasStrictTemplateBoundary(content, index) {
+			builder.WriteString("{{")
+		} else {
+			builder.WriteString(placeholder)
+		}
+		offset = index + len("{{")
+	}
+}
+
+func hasStrictTemplateBoundary(content string, index int) bool {
+	if index == 0 {
+		return true
+	}
+
+	prev, _ := utf8.DecodeLastRuneInString(content[:index])
+	return unicode.IsSpace(prev)
 }
 
 // EvaluateCondition checks whether a template selector condition matches the

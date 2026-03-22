@@ -45,6 +45,7 @@ type TemplateRef struct {
 	Condition    string `yaml:"condition"`
 	Template     string `yaml:"template"`
 	Evaluate     bool   `yaml:"evaluate"`
+	TemplateMode string `yaml:"template_mode"`
 	Absent       bool   `yaml:"absent"`
 	ResolvedPath string `yaml:"-"`
 }
@@ -54,6 +55,9 @@ const (
 	OutputsDir       = "outputs"
 	TemplatesDir     = "templates"
 	OutputFileSuffix = ".gitrepoforge"
+
+	TemplateModeDoubleBracket       = "DOUBLE_BRACKET"
+	TemplateModeDoubleBracketStrict = "DOUBLE_BRACKET_STRICT"
 )
 
 var reservedConfigNames = map[string]struct{}{
@@ -207,6 +211,7 @@ func loadOutputRules(outputsDir, templatesDir string) ([]FileRule, error) {
 			if rule.Templates[i].Absent {
 				continue
 			}
+			rule.Templates[i].TemplateMode = TemplateModeOrDefault(rule.Templates[i].TemplateMode)
 			resolved, err := resolveTemplatePath(templatesDir, rule.Templates[i].Template)
 			if err != nil {
 				return fmt.Errorf("output file %s: %w", path, err)
@@ -251,6 +256,9 @@ func validateTemplateRef(ref TemplateRef) error {
 		if ref.Evaluate {
 			return fmt.Errorf("absent template candidate cannot set evaluate")
 		}
+		if ref.TemplateMode != "" {
+			return fmt.Errorf("absent template candidate cannot set template_mode")
+		}
 		return nil
 	}
 
@@ -258,7 +266,29 @@ func validateTemplateRef(ref TemplateRef) error {
 		return fmt.Errorf("template is required unless absent is true")
 	}
 
+	if err := validateTemplateMode(ref.TemplateMode); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+// TemplateModeOrDefault returns the configured template mode, or the default
+// mode when the field is omitted.
+func TemplateModeOrDefault(mode string) string {
+	if mode == "" {
+		return TemplateModeDoubleBracket
+	}
+	return mode
+}
+
+func validateTemplateMode(mode string) error {
+	switch TemplateModeOrDefault(mode) {
+	case TemplateModeDoubleBracket, TemplateModeDoubleBracketStrict:
+		return nil
+	default:
+		return fmt.Errorf("template_mode must be one of %q or %q", TemplateModeDoubleBracket, TemplateModeDoubleBracketStrict)
+	}
 }
 
 func (d *ConfigDefinition) UnmarshalYAML(node *yaml.Node) error {
