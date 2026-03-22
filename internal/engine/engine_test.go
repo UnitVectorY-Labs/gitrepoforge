@@ -193,6 +193,62 @@ build:
 	}
 }
 
+func TestComputeFindingsMaterializesNestedDefaultsForOptionalObjects(t *testing.T) {
+	configRepo := t.TempDir()
+	writeTestFile(t, configRepo, "templates/docs/enabled.tmpl", `{{ .Config.docs.enabled }}`)
+
+	centralCfg := &config.CentralConfig{
+		Definitions: []config.ConfigDefinition{
+			{
+				Name: "docs",
+				Type: "object",
+				Attributes: []config.ConfigDefinition{
+					{Name: "enabled", Type: "boolean", Default: true, HasDefault: true},
+				},
+			},
+		},
+		Files: []config.FileRule{
+			{
+				Path: "docs/enabled.txt",
+				Templates: []config.TemplateRef{
+					{
+						Condition:    "docs.enabled",
+						Template:     "docs/enabled.tmpl",
+						Evaluate:     true,
+						ResolvedPath: filepath.Join(configRepo, "templates", "docs", "enabled.tmpl"),
+					},
+					{
+						Absent: true,
+					},
+				},
+			},
+		},
+	}
+	repoCfg := &config.RepoConfig{
+		Name:          "example-repo",
+		DefaultBranch: "main",
+	}
+
+	findings, err := ComputeFindings(repoCfg, centralCfg, t.TempDir())
+	if err != nil {
+		t.Fatalf("ComputeFindings returned error: %v", err)
+	}
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(findings))
+	}
+	if findings[0].Expected != "true" {
+		t.Fatalf("Expected = %q, want %q", findings[0].Expected, "true")
+	}
+
+	docs, ok := repoCfg.Config["docs"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Config[docs] has unexpected type %T", repoCfg.Config["docs"])
+	}
+	if docs["enabled"] != true {
+		t.Fatalf("Config[docs][enabled] = %v, want true", docs["enabled"])
+	}
+}
+
 func TestComputeFindingsDeletesFileWhenAbsentCandidateMatches(t *testing.T) {
 	configRepo := t.TempDir()
 	writeTestFile(t, configRepo, "templates/justfile.tmpl", "ignored")

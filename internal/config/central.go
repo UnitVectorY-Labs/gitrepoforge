@@ -321,18 +321,35 @@ func ApplyConfigDefaults(repoCfg *RepoConfig, centralCfg *CentralConfig) {
 		repoCfg.Config = map[string]interface{}{}
 	}
 
-	applyConfigDefaults(repoCfg.Config, centralCfg.Definitions)
+	applyConfigDefaults(repoCfg.Config, centralCfg.Definitions, false)
 }
 
-func applyConfigDefaults(values map[string]interface{}, definitions []ConfigDefinition) {
+func ResolvedConfigValues(repoCfg *RepoConfig, centralCfg *CentralConfig) map[string]interface{} {
+	values := map[string]interface{}{}
+	if repoCfg != nil && repoCfg.Config != nil {
+		cloned, ok := cloneDefaultValue(repoCfg.Config).(map[string]interface{})
+		if ok {
+			values = cloned
+		}
+	}
+	if centralCfg == nil {
+		return values
+	}
+
+	applyConfigDefaults(values, centralCfg.Definitions, true)
+	return values
+}
+
+func applyConfigDefaults(values map[string]interface{}, definitions []ConfigDefinition, materializeObjects bool) {
 	for _, def := range definitions {
 		current, exists := values[def.Name]
 		if !exists {
-			if !def.HasDefault {
+			defaultValue, ok := missingConfigValue(def, materializeObjects)
+			if !ok {
 				continue
 			}
-			values[def.Name] = cloneDefaultValue(def.Default)
-			current = values[def.Name]
+			values[def.Name] = defaultValue
+			current = defaultValue
 		}
 		if def.Type != "object" {
 			continue
@@ -341,9 +358,25 @@ func applyConfigDefaults(values map[string]interface{}, definitions []ConfigDefi
 		if !ok {
 			continue
 		}
-		applyConfigDefaults(attributes, def.Attributes)
+		applyConfigDefaults(attributes, def.Attributes, materializeObjects)
 		values[def.Name] = attributes
 	}
+}
+
+func missingConfigValue(def ConfigDefinition, materializeObjects bool) (interface{}, bool) {
+	if def.HasDefault {
+		return cloneDefaultValue(def.Default), true
+	}
+	if def.Type != "object" || !materializeObjects {
+		return nil, false
+	}
+
+	attributes := map[string]interface{}{}
+	applyConfigDefaults(attributes, def.Attributes, true)
+	if len(attributes) == 0 {
+		return nil, false
+	}
+	return attributes, true
 }
 
 func cloneDefaultValue(value interface{}) interface{} {

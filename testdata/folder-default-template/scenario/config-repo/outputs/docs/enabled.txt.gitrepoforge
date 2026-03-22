@@ -1,0 +1,5 @@
+templates:
+  - condition: docs.enabled
+    template: docs/enabled.txt.tmpl
+    evaluate: true
+  - absent: true

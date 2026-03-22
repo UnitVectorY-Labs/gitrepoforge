@@ -33,6 +33,7 @@ func ComputeFindings(repoCfg *config.RepoConfig, centralCfg *config.CentralConfi
 	var findings []Finding
 
 	config.ApplyConfigDefaults(repoCfg, centralCfg)
+	repoCfg.Config = config.ResolvedConfigValues(repoCfg, centralCfg)
 
 	data := TemplateData{
 		Name:          repoCfg.Name,

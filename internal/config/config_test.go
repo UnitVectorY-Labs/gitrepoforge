@@ -279,6 +279,37 @@ func TestApplyConfigDefaultsNestedObject(t *testing.T) {
 	}
 }
 
+func TestResolvedConfigValuesMaterializesOptionalObjectWithNestedDefaults(t *testing.T) {
+	repoCfg := &RepoConfig{
+		Name:          "example-repo",
+		DefaultBranch: "main",
+	}
+	centralCfg := &CentralConfig{
+		Definitions: []ConfigDefinition{
+			{
+				Name: "docs",
+				Type: "object",
+				Attributes: []ConfigDefinition{
+					{Name: "enabled", Type: "boolean", Default: true, HasDefault: true},
+				},
+			},
+		},
+	}
+
+	values := ResolvedConfigValues(repoCfg, centralCfg)
+
+	docs, ok := values["docs"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("values[docs] has unexpected type %T", values["docs"])
+	}
+	if docs["enabled"] != true {
+		t.Fatalf("values[docs][enabled] = %v, want true", docs["enabled"])
+	}
+	if repoCfg.Config != nil {
+		t.Fatalf("repoCfg.Config = %v, want nil", repoCfg.Config)
+	}
+}
+
 func TestLoadCentralConfigRejectsTemplateOutsideTemplatesDir(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "outputs/LICENSE.gitrepoforge", `templates:
