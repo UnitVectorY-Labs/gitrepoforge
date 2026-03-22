@@ -337,7 +337,7 @@ func applyConfigDefaults(values map[string]interface{}, definitions []ConfigDefi
 		if def.Type != "object" {
 			continue
 		}
-		attributes, ok := asConfigMap(current)
+		attributes, ok := AsConfigMap(current)
 		if !ok {
 			continue
 		}
@@ -375,7 +375,7 @@ func cloneDefaultValue(value interface{}) interface{} {
 	}
 }
 
-func asConfigMap(value interface{}) (map[string]interface{}, bool) {
+func AsConfigMap(value interface{}) (map[string]interface{}, bool) {
 	switch typed := value.(type) {
 	case map[string]interface{}:
 		return typed, true
@@ -425,7 +425,7 @@ func validateDefaultValue(def ConfigDefinition) error {
 			return fmt.Errorf("default must be a list")
 		}
 	case "object":
-		if _, ok := asConfigMap(def.Default); !ok {
+		if _, ok := AsConfigMap(def.Default); !ok {
 			return fmt.Errorf("default must be an object")
 		}
 	default:

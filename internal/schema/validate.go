@@ -146,7 +146,7 @@ func validateConfigValue(field string, val interface{}, def *config.ConfigDefini
 			errors = append(errors, ValidationError{Field: field, Message: "expected list value"})
 		}
 	case "object":
-		objectVal, ok := asConfigMap(val)
+		objectVal, ok := config.AsConfigMap(val)
 		if !ok {
 			errors = append(errors, ValidationError{Field: field, Message: "expected object value"})
 			return errors
@@ -157,23 +157,4 @@ func validateConfigValue(field string, val interface{}, def *config.ConfigDefini
 	}
 
 	return errors
-}
-
-func asConfigMap(value interface{}) (map[string]interface{}, bool) {
-	switch typed := value.(type) {
-	case map[string]interface{}:
-		return typed, true
-	case map[interface{}]interface{}:
-		result := make(map[string]interface{}, len(typed))
-		for key, nestedValue := range typed {
-			keyName, ok := key.(string)
-			if !ok {
-				return nil, false
-			}
-			result[keyName] = nestedValue
-		}
-		return result, true
-	default:
-		return nil, false
-	}
 }
