@@ -42,11 +42,12 @@ The optional `template_mode` field controls how template delimiters are recogniz
 
 | `template_mode` | Description |
 |-----------------|-------------|
-| `DOUBLE_BRACKET` | Default behavior. Any `{{ ... }}` sequence is treated as a Go template action. |
-| `DOUBLE_BRACKET_STRICT` | Only treats `{{ ... }}` as a Go template action when the `{{` appears at the start of the file or is immediately preceded by whitespace. |
+| `DOUBLE_BRACKET` | Default behavior. Any {% raw %}`{{ ... }}`{% endraw %} sequence is treated as a Go template action. |
+| `DOUBLE_BRACKET_STRICT` | Only treats {% raw %}`{{ ... }}`{% endraw %} as a Go template action when the {% raw %}`{{`{% endraw %} appears at the start of the file or is immediately preceded by whitespace. |
 
 **`templates/justfile.tmpl`**
 
+{% raw %}
 ```text
 # Commands for {{.Name}}
 default:
@@ -63,6 +64,7 @@ build:
   mvn package
 {{- end }}
 ```
+{% endraw %}
 
 **`outputs/justfile.gitrepoforge`**
 
@@ -76,7 +78,7 @@ templates:
 
 The `template` value is always a path relative to `templates/`.
 
-Use `DOUBLE_BRACKET_STRICT` when a file needs to preserve other `{{ ... }}`-style syntax such as GitHub Actions expressions:
+Use `DOUBLE_BRACKET_STRICT` when a file needs to preserve other {% raw %}`{{ ... }}`{% endraw %}-style syntax such as GitHub Actions expressions:
 
 **`outputs/.github/workflows/ci.yml.gitrepoforge`**
 
@@ -89,11 +91,13 @@ templates:
 
 **`templates/.github/workflows/ci.yml.tmpl`**
 
+{% raw %}
 ```yaml
 key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
 {{- if eq .Config.codecov true }}
 - uses: codecov/codecov-action@v4
 {{- end }}
 ```
+{% endraw %}
 
-In strict mode, the `${{ ... }}` expressions stay literal because the `{{` is preceded by `$`, while the control blocks still execute because they start on their own lines.
+In strict mode, the {% raw %}`${{ ... }}`{% endraw %} expressions stay literal because the {% raw %}`{{`{% endraw %} is preceded by `$`, while the control blocks still execute because they start on their own lines.

@@ -4,6 +4,7 @@ The root config lives at the workspace root, outside the managed repos, in `.git
 
 ## Example
 
+{% raw %}
 ```yaml
 config_repo: config-repo
 excludes:
@@ -18,6 +19,7 @@ pull_request: GITHUB_CLI
 return_to_original_branch: true
 delete_branch: true
 ```
+{% endraw %}
 
 ## Fields
 
@@ -33,9 +35,9 @@ The Git-related fields in `.gitrepoforge-config` control how `apply` and `bootst
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `create_branch` | boolean | No | Create a new branch before making changes. |
-| `branch_name` | string | Yes* | Name for the new branch. Supports `{{param}}` placeholders. *Required if `create_branch` is true. |
+| `branch_name` | string | Yes* | Name for the new branch. Supports {% raw %}`{{param}}`{% endraw %} placeholders. *Required if `create_branch` is true. |
 | `commit` | boolean | No | Commit the changes after modification. |
-| `commit_message` | string | Yes* | Commit message. Supports `{{param}}` placeholders. *Required if `commit` is true. |
+| `commit_message` | string | Yes* | Commit message. Supports {% raw %}`{{param}}`{% endraw %} placeholders. *Required if `commit` is true. |
 | `push` | boolean | No | Push the branch to the remote repository. |
 | `remote` | string | Yes* | Git remote name (for example `origin`). *Required if `push` is true. |
 | `pull_request` | string | No | Create a pull request. Values: `NO` (default), `GITHUB_CLI`. |
@@ -44,7 +46,7 @@ The Git-related fields in `.gitrepoforge-config` control how `apply` and `bootst
 
 ### Placeholder Values
 
-`branch_name` and `commit_message` may use `{{param}}` placeholders. In gitrepoforge those placeholders are resolved from the target repo's `.gitrepoforge` values:
+`branch_name` and `commit_message` may use {% raw %}`{{param}}`{% endraw %} placeholders. In gitrepoforge those placeholders are resolved from the target repo's `.gitrepoforge` values:
 
 - `name`
 - `default_branch`

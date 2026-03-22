@@ -137,7 +137,7 @@ templates:
 | `condition` | no | Boolean selector for the candidate. Empty means always matches, which is useful for a fallthrough entry. Supported forms are documented in [Condition Syntax](/Users/jaredhatfield/github/gitrepoforge/docs/conditions.md). |
 | `template` | yes unless `absent` is true | Path to a file under `templates/`. |
 | `evaluate` | no | If true, render the template file with template data. If false or omitted, copy the file verbatim. |
-| `template_mode` | no | Controls how template delimiters are recognized when `evaluate` is true. `DOUBLE_BRACKET` is the default. `DOUBLE_BRACKET_STRICT` only recognizes `{{` when it is at the start of the file or preceded by whitespace. |
+| `template_mode` | no | Controls how template delimiters are recognized when `evaluate` is true. `DOUBLE_BRACKET` is the default. `DOUBLE_BRACKET_STRICT` only recognizes {% raw %}`{{`{% endraw %} when it is at the start of the file or preceded by whitespace. |
 | `absent` | no | If true, the selected result is that the target file must not exist. |
 
 ### Selection Rules
@@ -176,7 +176,7 @@ templates:
   - absent: true
 ```
 
-Use strict delimiter matching when the file also contains other `{{ ... }}`-style syntax, such as GitHub Actions expressions:
+Use strict delimiter matching when the file also contains other {% raw %}`{{ ... }}`{% endraw %}-style syntax, such as GitHub Actions expressions:
 
 ```yaml
 templates:
@@ -185,10 +185,11 @@ templates:
     template_mode: DOUBLE_BRACKET_STRICT
 ```
 
-With `DOUBLE_BRACKET_STRICT`, `${{ runner.os }}` remains literal because the `{{` is preceded by `$`, while template directives like `{{- if eq .Config.codecov true }}` still evaluate when they begin on their own lines.
+With `DOUBLE_BRACKET_STRICT`, {% raw %}`${{ runner.os }}`{% endraw %} remains literal because the {% raw %}`{{`{% endraw %} is preceded by `$`, while template directives like {% raw %}`{{- if eq .Config.codecov true }}`{% endraw %} still evaluate when they begin on their own lines.
 
 The evaluated template can branch on other config values internally:
 
+{% raw %}
 ```text
 # Commands for {{.Name}}
 default:
@@ -205,6 +206,7 @@ build:
   mvn package
 {{- end }}
 ```
+{% endraw %}
 
 Nested config values can also be referenced in conditions with dotted keys:
 
