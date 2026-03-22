@@ -1,3 +1,4 @@
+# .github/workflows/zizmor.yml
 name: GitHub Actions Security Analysis with zizmor 🌈
 
 on:

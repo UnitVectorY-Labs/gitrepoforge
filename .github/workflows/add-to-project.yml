@@ -1,3 +1,4 @@
+# .github/workflows/add-to-project.yml
 name: Add all issues and pull requests to project
 
 on:

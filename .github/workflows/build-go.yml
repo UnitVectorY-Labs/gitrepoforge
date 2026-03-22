@@ -1,4 +1,6 @@
+# .github/workflows/build-go.yml
 name: Build and Test Go Application
+
 on:
   push:
     branches:

@@ -4,6 +4,7 @@ config:
   description: "Command line application to audit and apply standard file patterns to Git repos."
   license: MIT
   language: go
+  release: release-go
   justfile: true
   docs:
     enabled: true
