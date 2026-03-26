@@ -124,3 +124,7 @@ $RECYCLE.BIN/
 
 # Go workspace file
 go.work
+
+## Universal Ignore Patterns
+
+*.log
