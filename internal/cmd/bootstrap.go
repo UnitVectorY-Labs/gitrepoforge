@@ -44,6 +44,7 @@ func runBootstrap(version string, args []string) {
 
 	repoPath := filepath.Join(workspaceDir, *repoFlag)
 	report := output.NewReport(version, "bootstrap", filepath.Join(workspaceDir, config.RootConfigFileName), configRepoPath)
+	report.IgnoreMissing = rootCfg.IgnoreMissing
 
 	if !*jsonFlag {
 		output.Header("gitrepoforge bootstrap")
@@ -113,10 +114,14 @@ func bootstrapRepo(repoPath, repoName string, rootCfg *config.RootConfig, centra
 	}
 
 	if len(findings) == 0 {
-		return output.RepoResult{
+		result := output.RepoResult{
 			Name:   repoName,
 			Status: "clean",
 		}
+		if !rootCfg.Git.Commit {
+			result.StatusDetail = cleanStatusDetail(repoPath)
+		}
+		return result
 	}
 
 	return applyFindingsWithGit(repoPath, repoName, repoCfg, rootCfg, findings)

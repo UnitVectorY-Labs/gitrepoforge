@@ -46,6 +46,10 @@ When `--verbose` is set, drift findings also include per-file diffs showing remo
 | `invalid` | Validation errors such as missing config values or type mismatches. |
 | `drift` | Findings were detected and files differ from the desired state. |
 
+When `commit` is not enabled in the root config and a repo is `clean`, the output may include an additional detail if the repo has uncommitted changes: `compliant (not staged)` or `compliant (staged, not committed)`.
+
+When `ignore_missing` is `true` in the root config, repos with the `skipped` status are not shown in the human-readable output.
+
 ## apply
 
 Applies the desired state to repos by writing files and then optionally running the shared Git automation from `.gitrepoforge-config`.
@@ -83,6 +87,8 @@ gitrepoforge apply [flags]
 | `invalid` | Validation errors prevented apply. |
 | `applied` | Changes were written successfully, including any configured Git automation. |
 | `failed` | An error occurred during Git operations. |
+
+When `commit` is not enabled and a repo is `clean`, the same `compliant (not staged)` or `compliant (staged, not committed)` warnings described in the validate section apply here as well.
 
 ## bootstrap
 

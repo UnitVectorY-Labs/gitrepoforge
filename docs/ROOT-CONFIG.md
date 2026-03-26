@@ -14,6 +14,7 @@ The root config lives at the workspace root, outside the managed repos, in `.git
 {% raw %}
 ```yaml
 config_repo: config-repo
+ignore_missing: false
 excludes:
   - archived-*
 create_branch: true
@@ -34,6 +35,7 @@ delete_branch: true
 |-------|----------|-------------|
 | `config_repo` | yes | Relative or absolute path to the config repo. |
 | `excludes` | no | Repo folder globs to skip during discovery. |
+| `ignore_missing` | no | When `true`, suppresses the warning for repos that have no `.gitrepoforge` file. Defaults to `false`. |
 
 ## Git Fields
 
@@ -69,6 +71,15 @@ The Git-related fields in `.gitrepoforge-config` control how `apply` and `bootst
 - `return_to_original_branch` requires `create_branch` to be `true`.
 - `delete_branch` requires `return_to_original_branch` to be `true`.
 - Unknown placeholders in `branch_name` or `commit_message` are rejected for the affected repo.
+
+### Compliant Status Warnings
+
+When `commit` is `false` (or not set), the tool applies file changes without committing them. If a repo is compliant (files match the desired state) but has uncommitted changes in the working tree, the console output includes an additional warning:
+
+- **not staged** – the repo has changes that are not staged with git.
+- **staged, not committed** – the repo has changes staged in the index but not yet committed.
+
+These warnings help identify repos where the desired state has been applied but the changes have not been persisted in git.
 
 ### Removed Fields
 

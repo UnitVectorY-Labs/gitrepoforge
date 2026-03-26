@@ -42,6 +42,7 @@ func runApply(version string, args []string) {
 	}
 
 	report := output.NewReport(version, "apply", filepath.Join(workspaceDir, config.RootConfigFileName), configRepoPath)
+	report.IgnoreMissing = rootCfg.IgnoreMissing
 
 	var repos []string
 	if *repoFlag != "" {
@@ -129,10 +130,14 @@ func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg
 	}
 
 	if len(findings) == 0 {
-		return output.RepoResult{
+		result := output.RepoResult{
 			Name:   repoName,
 			Status: "clean",
 		}
+		if !rootCfg.Git.Commit {
+			result.StatusDetail = cleanStatusDetail(repoPath)
+		}
+		return result
 	}
 
 	return applyFindingsWithGit(repoPath, repoName, repoCfg, rootCfg, findings)
@@ -321,4 +326,23 @@ func validateGitTemplate(field, template string, values map[string]string) []str
 
 	sort.Strings(unknown)
 	return []string{fmt.Sprintf("%s: unknown placeholder(s): %s", field, strings.Join(unknown, ", "))}
+}
+
+// cleanStatusDetail checks the git status of a repo that is already compliant
+// and returns a detail string indicating whether changes are staged or unstaged.
+// Returns "" if the repo is fully clean, "staged" if there are staged but
+// uncommitted changes, or "unstaged" if there are unstaged changes.
+func cleanStatusDetail(repoPath string) string {
+	clean, err := gitops.IsClean(repoPath)
+	if err != nil || clean {
+		return ""
+	}
+	staged, err := gitops.HasChanges(repoPath)
+	if err != nil {
+		return ""
+	}
+	if staged {
+		return "staged"
+	}
+	return "unstaged"
 }

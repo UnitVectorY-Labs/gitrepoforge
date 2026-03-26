@@ -606,6 +606,36 @@ pull_request: github_cli
 	}
 }
 
+func TestLoadRootConfigIgnoreMissingDefault(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, "config_repo: config-repo\n")
+
+	cfg, err := LoadRootConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadRootConfig returned error: %v", err)
+	}
+
+	if cfg.IgnoreMissing {
+		t.Fatalf("IgnoreMissing = true, want false (default)")
+	}
+}
+
+func TestLoadRootConfigIgnoreMissingTrue(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
+ignore_missing: true
+`)
+
+	cfg, err := LoadRootConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadRootConfig returned error: %v", err)
+	}
+
+	if !cfg.IgnoreMissing {
+		t.Fatalf("IgnoreMissing = false, want true")
+	}
+}
+
 func TestLoadCentralConfigRejectsUnexpectedOutputFile(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "outputs/.github/workflows/add-to-project.yml.gitrepofroge", `templates:
