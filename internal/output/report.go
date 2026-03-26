@@ -8,10 +8,11 @@ import (
 
 // Report is the structured JSON output for all commands.
 type Report struct {
-	Tool       ToolMeta     `json:"tool"`
-	RootConfig string       `json:"root_config_path"`
-	ConfigRepo string       `json:"central_config_path"`
-	Repos      []RepoResult `json:"repos"`
+	Tool          ToolMeta     `json:"tool"`
+	RootConfig    string       `json:"root_config_path"`
+	ConfigRepo    string       `json:"central_config_path"`
+	IgnoreMissing bool         `json:"-"`
+	Repos         []RepoResult `json:"repos"`
 }
 
 // ToolMeta contains tool metadata.
@@ -26,6 +27,7 @@ type ToolMeta struct {
 type RepoResult struct {
 	Name             string          `json:"repo"`
 	Status           string          `json:"status"`
+	StatusDetail     string          `json:"status_detail,omitempty"`
 	ValidationErrors []string        `json:"validation_errors,omitempty"`
 	Findings         []FindingOutput `json:"findings,omitempty"`
 }
@@ -68,9 +70,18 @@ func (r *Report) PrintHuman(verbose bool) {
 	for _, repo := range r.Repos {
 		switch repo.Status {
 		case "clean":
-			Success(fmt.Sprintf("%s: compliant", repo.Name))
+			switch repo.StatusDetail {
+			case "staged":
+				Warning(fmt.Sprintf("%s: compliant (staged, not committed)", repo.Name))
+			case "unstaged":
+				Warning(fmt.Sprintf("%s: compliant (not staged)", repo.Name))
+			default:
+				Success(fmt.Sprintf("%s: compliant", repo.Name))
+			}
 		case "skipped":
-			Warning(fmt.Sprintf("%s: skipped (no .gitrepoforge file)", repo.Name))
+			if !r.IgnoreMissing {
+				Warning(fmt.Sprintf("%s: skipped (no .gitrepoforge file)", repo.Name))
+			}
 		case "invalid":
 			Error(fmt.Sprintf("%s: invalid configuration", repo.Name))
 			for _, e := range repo.ValidationErrors {

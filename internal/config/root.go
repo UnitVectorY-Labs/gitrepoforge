@@ -24,17 +24,19 @@ type GitConfig struct {
 // RootConfig represents the root config dotfile (.gitrepoforge-config)
 // that lives in the checkout root (workspace directory).
 type RootConfig struct {
-	ConfigRepo string    `yaml:"config_repo"`
-	Excludes   []string  `yaml:"excludes"`
-	Git        GitConfig `yaml:"-"`
+	ConfigRepo    string    `yaml:"config_repo"`
+	Excludes      []string  `yaml:"excludes"`
+	IgnoreMissing bool      `yaml:"ignore_missing"`
+	Git           GitConfig `yaml:"-"`
 }
 
 const RootConfigFileName = ".gitrepoforge-config"
 
 type rawRootConfig struct {
-	ConfigRepo string   `yaml:"config_repo"`
-	Excludes   []string `yaml:"excludes"`
-	GitConfig  `yaml:",inline"`
+	ConfigRepo    string   `yaml:"config_repo"`
+	Excludes      []string `yaml:"excludes"`
+	IgnoreMissing bool     `yaml:"ignore_missing"`
+	GitConfig     `yaml:",inline"`
 }
 
 func LoadRootConfig(workspaceDir string) (*RootConfig, error) {
@@ -49,9 +51,10 @@ func LoadRootConfig(workspaceDir string) (*RootConfig, error) {
 		return nil, fmt.Errorf("failed to parse root config %s: %w", path, err)
 	}
 	cfg := RootConfig{
-		ConfigRepo: raw.ConfigRepo,
-		Excludes:   raw.Excludes,
-		Git:        raw.GitConfig,
+		ConfigRepo:    raw.ConfigRepo,
+		Excludes:      raw.Excludes,
+		IgnoreMissing: raw.IgnoreMissing,
+		Git:           raw.GitConfig,
 	}
 	if cfg.ConfigRepo == "" {
 		return nil, fmt.Errorf("root config %s: config_repo is required", path)

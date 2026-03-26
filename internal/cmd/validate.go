@@ -40,6 +40,7 @@ func runValidate(version string, args []string) {
 	}
 
 	report := output.NewReport(version, "validate", filepath.Join(workspaceDir, config.RootConfigFileName), configRepoPath)
+	report.IgnoreMissing = rootCfg.IgnoreMissing
 
 	var repos []string
 	if *repoFlag != "" {
@@ -108,10 +109,14 @@ func runValidate(version string, args []string) {
 		}
 
 		if len(findings) == 0 {
-			report.Repos = append(report.Repos, output.RepoResult{
+			result := output.RepoResult{
 				Name:   repoName,
 				Status: "clean",
-			})
+			}
+			if !rootCfg.Git.Commit {
+				result.StatusDetail = cleanStatusDetail(repoPath)
+			}
+			report.Repos = append(report.Repos, result)
 		} else {
 			var findingOutputs []output.FindingOutput
 			for _, f := range findings {
