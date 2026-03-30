@@ -344,12 +344,21 @@ func buildNewFileFromSections(parsed *ParsedTemplate) (string, error) {
 		parts = append(parts, parsed.BootstrapContent)
 	}
 
-	return strings.Join(parts, "\n"), nil
+	result := strings.Join(parts, "\n")
+
+	// Ensure non-empty new files end with a newline, matching standard
+	// text file conventions.
+	if result != "" && !strings.HasSuffix(result, "\n") {
+		result += "\n"
+	}
+
+	return result, nil
 }
 
 // applyToExistingFile applies managed sections to an existing file, preserving
 // content outside the managed sections.
 func applyToExistingFile(parsed *ParsedTemplate, fileContent string) (string, error) {
+	trailingNewline := strings.HasSuffix(fileContent, "\n")
 	lines := strings.Split(fileContent, "\n")
 
 	// Apply each section in order
@@ -376,7 +385,14 @@ func applyToExistingFile(parsed *ParsedTemplate, fileContent string) (string, er
 		lines = newLines
 	}
 
-	return strings.Join(lines, "\n"), nil
+	result := strings.Join(lines, "\n")
+
+	// Preserve the original file's trailing newline convention
+	if trailingNewline && !strings.HasSuffix(result, "\n") {
+		result += "\n"
+	}
+
+	return result, nil
 }
 
 // resolveBoundary finds the line index for a boundary in the given lines.
