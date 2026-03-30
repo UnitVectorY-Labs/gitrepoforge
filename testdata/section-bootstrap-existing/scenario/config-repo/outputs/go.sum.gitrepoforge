@@ -1,0 +1,3 @@
+templates:
+  - condition: manage_gosum
+    template: go.sum.tmpl

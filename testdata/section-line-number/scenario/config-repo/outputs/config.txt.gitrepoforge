@@ -1,0 +1,3 @@
+templates:
+  - condition: manage_header
+    template: config.txt.tmpl
