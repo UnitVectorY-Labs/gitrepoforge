@@ -1,0 +1,3 @@
+templates:
+  - condition: readme
+    template: README.md.tmpl

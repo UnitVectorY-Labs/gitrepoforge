@@ -277,12 +277,14 @@ templates:
 
 **`templates/README.md.tmpl`**
 
+{% raw %}
 ```text
 {{ section start=start_of_file end=contains("<!-- END MANAGED -->") }}
 # My Project
 <!-- END MANAGED -->
 {{ endsection }}
 ```
+{% endraw %}
 
 Ensure a file exists without managing its content. Useful for files like `go.sum` that should be present but are maintained by other tools:
 
@@ -296,15 +298,18 @@ templates:
 
 **`templates/go.sum.tmpl`**
 
+{% raw %}
 ```text
 {{ bootstrap }}
 {{ endbootstrap }}
 ```
+{% endraw %}
 
 Manage both a header and footer while preserving user content in between:
 
 **`templates/README.md.tmpl`**
 
+{% raw %}
 ```text
 {{ section start=start_of_file end=content("<!-- END HEADER -->") }}
 # Managed Header
@@ -315,11 +320,13 @@ Manage both a header and footer while preserving user content in between:
 Managed Footer Content
 {{ endsection }}
 ```
+{% endraw %}
 
 Provide default body content on first creation, then manage only the header afterwards:
 
 **`templates/README.md.tmpl`**
 
+{% raw %}
 ```text
 {{ section start=start_of_file end=contains("<!-- END MANAGED -->") }}
 # Managed Header
@@ -329,6 +336,7 @@ Provide default body content on first creation, then manage only the header afte
 Default body content goes here.
 {{ endbootstrap }}
 ```
+{% endraw %}
 
 ## `templates/`
 

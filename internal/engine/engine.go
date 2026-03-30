@@ -101,19 +101,49 @@ func evaluateCreateRule(rule config.FileRule, data TemplateData, repoPath string
 		return evaluateDeleteRule(rule, repoPath)
 	}
 
-	materialized, err := materializeTemplateFile(selected, data)
+	// Read raw template content to detect section directives before
+	// Go template evaluation (directives use {{ }} syntax and must be
+	// extracted first).
+	rawContent, err := os.ReadFile(selected.ResolvedPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read template %s: %w", selected.ResolvedPath, err)
 	}
 
-	// Parse section directives from the materialized template
-	parsed, err := parseTemplateDirectives(materialized)
+	parsed, err := parseTemplateDirectives(string(rawContent))
 	if err != nil {
 		return nil, fmt.Errorf("parsing template directives for %s: %w", rule.Path, err)
 	}
 
 	if parsed.IsWholeFile {
-		return evaluateWholeFileRule(rule, parsed.OriginalContent, repoPath)
+		materialized, err := materializeTemplateFile(selected, data)
+		if err != nil {
+			return nil, err
+		}
+		return evaluateWholeFileRule(rule, materialized, repoPath)
+	}
+
+	// Section-based: evaluate content blocks if template evaluation is enabled
+	if selected.Evaluate {
+		for i := range parsed.Sections {
+			rendered, err := renderTemplateContent(
+				selected.ResolvedPath, parsed.Sections[i].Content,
+				selected.TemplateMode, data,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("rendering section content for %s: %w", rule.Path, err)
+			}
+			parsed.Sections[i].Content = rendered
+		}
+		if parsed.HasBootstrap {
+			rendered, err := renderTemplateContent(
+				selected.ResolvedPath, parsed.BootstrapContent,
+				selected.TemplateMode, data,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("rendering bootstrap content for %s: %w", rule.Path, err)
+			}
+			parsed.BootstrapContent = rendered
+		}
 	}
 
 	return evaluateSectionRule(rule, parsed, repoPath)
@@ -263,6 +293,44 @@ func renderTemplateFile(path, templateMode string, data TemplateData) (string, e
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return "", fmt.Errorf("failed to execute template %s: %w", path, err)
+	}
+
+	rendered := buf.String()
+	if placeholder != "" {
+		rendered = strings.ReplaceAll(rendered, placeholder, "{{")
+	}
+
+	return rendered, nil
+}
+
+// renderTemplateContent evaluates a content string as a Go template.
+// Used for section and bootstrap content blocks that need template evaluation.
+func renderTemplateContent(path, content, templateMode string, data TemplateData) (string, error) {
+	preparedContent, placeholder := prepareTemplateContent(content, templateMode)
+
+	funcMap := template.FuncMap{
+		"getConfig": func(values map[string]interface{}, key string) interface{} {
+			if values == nil {
+				return nil
+			}
+			return values[key]
+		},
+		"quote_double": func(value interface{}) string {
+			return quoteDoubleTemplateValue(value)
+		},
+		"quote_single": func(value interface{}) string {
+			return quoteSingleTemplateValue(value)
+		},
+	}
+
+	tmpl, err := template.New(filepath.Base(path)).Funcs(funcMap).Parse(preparedContent)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse template content from %s: %w", path, err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("failed to execute template content from %s: %w", path, err)
 	}
 
 	rendered := buf.String()

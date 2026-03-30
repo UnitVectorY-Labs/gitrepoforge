@@ -9,17 +9,52 @@ permalink: /templates
 
 Templates live in the config repo under `templates/`. Output rules point at files in that folder and choose whether to copy them verbatim or evaluate them as templates.
 
-## Data Available To Templates
+## Template Directives
 
-When `evaluate: true` is set on a candidate, the file is rendered with:
+{% raw %}
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `.Name` | `string` | Repository name from `.gitrepoforge`. |
-| `.DefaultBranch` | `string` | Repository default branch from `.gitrepoforge`. |
-| `.Config` | `map[string]interface{}` | Repo config values from `.gitrepoforge`. |
+All directives use the `{{ }}` delimiter syntax. The following table documents every directive available in templates.
 
-## Helper Function
+### Value and Output Directives
+
+| Directive | Description |
+|-----------|-------------|
+| `{{ .Name }}` | Print the repository name. |
+| `{{ .DefaultBranch }}` | Print the repository default branch. |
+| `{{ .Config.key }}` | Print a config value. Nested keys use dots, e.g. `{{ .Config.docs.domain }}`. |
+| `{{ value \| quote_double }}` | Pipe a value through the `quote_double` function. |
+| `{{ value \| quote_single }}` | Pipe a value through the `quote_single` function. |
+
+### Control Flow Directives
+
+| Directive | Description |
+|-----------|-------------|
+| `{{ if condition }}...{{ end }}` | Conditional block. Content is included only when condition is true. |
+| `{{ if condition }}...{{ else }}...{{ end }}` | Conditional with fallback. |
+| `{{ range .Items }}...{{ end }}` | Iterate over a list. |
+| `{{ with value }}...{{ end }}` | Set dot to value if non-empty. |
+| `{{- ... }}` | Trim whitespace before the directive. |
+| `{{ ... -}}` | Trim whitespace after the directive. |
+| `{{ /* comment */ }}` | Template comment, not included in output. |
+
+### Section Management Directives
+
+Section directives let a template manage specific regions of a file instead of replacing the entire file. When a template contains section directives, all content must be inside section, bootstrap, or join blocks.
+
+| Directive | Description |
+|-----------|-------------|
+| `{{ section start=<boundary> end=<boundary> }}` | Define a managed section with both boundaries. |
+| `{{ section start=<boundary> }}` | Define a managed section from a boundary to the end of the file. |
+| `{{ section end=<boundary> }}` | Define a managed section from the start of the file to a boundary. |
+| `{{ endsection }}` | End a section block. |
+| `{{ bootstrap }}` | Content only added when the file is first created. |
+| `{{ endbootstrap }}` | End a bootstrap block. |
+| `{{ join }}` | Join enclosed lines into a single line by removing newlines. |
+| `{{ endjoin }}` | End a join block. |
+
+{% endraw %}
+
+### Helper Functions
 
 | Function | Description |
 |----------|-------------|
@@ -125,17 +160,6 @@ go-version: {{ .Config.versions.go | quote_double }}
 
 Section directives let a template manage specific regions of a file instead of replacing the entire file. When a template contains section directives, all content must be inside section, bootstrap, or join blocks.
 
-### Directive Syntax
-
-| Directive | Description |
-|-----------|-------------|
-| `{{ section start=<boundary> end=<boundary> }}` | Defines a managed section of the file. |
-| `{{ bootstrap }}` | Content only added when the file is first created. |
-| `{{ join }}` | Joins enclosed lines into a single line by removing newlines. |
-| `{{ endsection }}` | Ends a section block. |
-| `{{ endbootstrap }}` | Ends a bootstrap block. |
-| `{{ endjoin }}` | Ends a join block. |
-
 ### Boundary Types
 
 Boundaries define where a managed section starts and ends in the target file:
@@ -148,6 +172,8 @@ Boundaries define where a managed section starts and ends in the target file:
 | `content("text")` | Exact line match after trimming whitespace. |
 | `contains("text")` | Line that contains the given text. |
 
+A section directive requires at least one boundary. When only `start=` is specified, the end defaults to `end_of_file`. When only `end=` is specified, the start defaults to `start_of_file`.
+
 ### Behavior
 
 **New files:** All section contents are concatenated in order and any bootstrap content is appended. The resulting content becomes the new file.
@@ -156,28 +182,35 @@ Boundaries define where a managed section starts and ends in the target file:
 
 **Join blocks:** Lines inside a join block are concatenated with newlines removed, producing a single line. Join blocks can appear inside section blocks.
 
+{% raw %}
 The `{{ endsection }}` directive does not produce a trailing newline in the section content. This means the last line of a section block is included without an extra newline appended after it. For example, a section containing two lines produces content equivalent to `"line1\nline2"` rather than `"line1\nline2\n"`.
+{% endraw %}
 
 ### Examples
 
 Manage the header of a README while preserving user content below it:
 
+{% raw %}
 ```text
 {{ section start=start_of_file end=contains("<!-- END MANAGED -->") }}
 # My Project
 <!-- END MANAGED -->
 {{ endsection }}
 ```
+{% endraw %}
 
 Create a file only on first run (bootstrap), then leave it alone:
 
+{% raw %}
 ```text
 {{ bootstrap }}
 {{ endbootstrap }}
 ```
+{% endraw %}
 
 Join badge images onto a single line:
 
+{% raw %}
 ```text
 {{ section start=start_of_file end=contains("<!-- END BADGES -->") }}
 {{ join }}
@@ -187,9 +220,11 @@ Join badge images onto a single line:
 <!-- END BADGES -->
 {{ endsection }}
 ```
+{% endraw %}
 
 Manage multiple sections (header and footer) while preserving everything in between:
 
+{% raw %}
 ```text
 {{ section start=start_of_file end=content("<!-- END HEADER -->") }}
 # Managed Header
@@ -200,6 +235,7 @@ Manage multiple sections (header and footer) while preserving everything in betw
 Managed Footer Content
 {{ endsection }}
 ```
+{% endraw %}
 
 {% raw %}
 Use `evaluate: true` with section directives for template rendering inside sections:
@@ -214,13 +250,16 @@ Use `evaluate: true` with section directives for template rendering inside secti
 
 Manage only the footer of a file, preserving user content above:
 
+{% raw %}
 ```text
 {{ section start=contains("<!-- START FOOTER -->") end=end_of_file }}
 <!-- START FOOTER -->
 Managed Footer
 {{ endsection }}
 ```
+{% endraw %}
 
+{% raw %}
 Use `line(N)` to manage a fixed number of lines at the top of a file:
 
 ```text
@@ -230,7 +269,9 @@ Line 2 managed
 Line 3 managed
 {{ endsection }}
 ```
+{% endraw %}
 
+{% raw %}
 Combine a managed header section with bootstrap content that only appears when the file is first created:
 
 ```text
@@ -242,12 +283,32 @@ Combine a managed header section with bootstrap content that only appears when t
 Default body content goes here.
 {{ endbootstrap }}
 ```
+{% endraw %}
 
 When this template creates a new file, the result includes both the header section and the bootstrap text. On subsequent runs, only the header section is managed and the bootstrap text is ignored, allowing the user to replace the default body with their own content.
+
+{% raw %}
+Use only `start=` when the managed section should extend to the end of the file:
+
+```text
+{{ section start=contains("<!-- START FOOTER -->") }}
+<!-- START FOOTER -->
+Managed Footer
+{{ endsection }}
+```
+
+Use only `end=` when the managed section should start at the beginning of the file:
+
+```text
+{{ section end=contains("<!-- END MANAGED -->") }}
+# Managed Header
+<!-- END MANAGED -->
+{{ endsection }}
+```
+{% endraw %}
 
 ### Error Handling
 
 If a section directive references a boundary that cannot be found in an existing file, the operation fails with an error. This ensures that managed sections are only applied when the file structure matches expectations.
 
 Content outside of section, bootstrap, or join blocks in a template that uses directives is not allowed and produces an error. Blank lines between blocks are permitted.
-

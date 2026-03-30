@@ -7,9 +7,6 @@ import (
 )
 
 const (
-	directivePrefix = "#!gitrepoforge:"
-	directiveEnd    = "#!gitrepoforge:end"
-
 	boundaryStartOfFile = "start_of_file"
 	boundaryEndOfFile   = "end_of_file"
 	boundaryLine        = "line"
@@ -31,28 +28,23 @@ type Section struct {
 }
 
 // ParsedTemplate is the result of parsing section directives from a
-// materialized template. If no directives are found, IsWholeFile is true
-// and the template should replace the entire file (backward compatible).
+// template. If no directives are found, IsWholeFile is true and the
+// template should replace the entire file (backward compatible).
 type ParsedTemplate struct {
-	Sections          []Section
-	BootstrapContent  string
-	HasBootstrap      bool
-	IsWholeFile       bool
-	OriginalContent   string
+	Sections         []Section
+	BootstrapContent string
+	HasBootstrap     bool
+	IsWholeFile      bool
+	OriginalContent  string
 }
 
-// parseTemplateDirectives parses the materialized template content for section
-// directives. If no directives are found, it returns a ParsedTemplate with
-// IsWholeFile=true and OriginalContent set to the full content.
+// parseTemplateDirectives parses the raw template content for section
+// directives using {{ }} syntax. If no directives are found, it returns
+// a ParsedTemplate with IsWholeFile=true.
 func parseTemplateDirectives(content string) (*ParsedTemplate, error) {
-	// First, process join blocks
-	processed, err := processJoinBlocks(content)
-	if err != nil {
-		return nil, err
-	}
+	lines := strings.Split(content, "\n")
 
-	// Check if there are any directives at all
-	if !strings.Contains(processed, directivePrefix) {
+	if !hasStructuralDirectives(lines) {
 		return &ParsedTemplate{
 			IsWholeFile:     true,
 			OriginalContent: content,
@@ -60,98 +52,160 @@ func parseTemplateDirectives(content string) (*ParsedTemplate, error) {
 	}
 
 	result := &ParsedTemplate{}
-
-	lines := strings.Split(processed, "\n")
 	i := 0
 	for i < len(lines) {
-		line := strings.TrimSpace(lines[i])
+		trimmed := strings.TrimSpace(lines[i])
 
-		if line == "" || !strings.HasPrefix(line, directivePrefix) {
-			// Content outside directives - must be blank
-			if line != "" {
-				return nil, fmt.Errorf("content outside of section directives is not allowed: %q", lines[i])
-			}
+		if trimmed == "" {
 			i++
 			continue
 		}
 
-		directive := line[len(directivePrefix):]
+		inner := extractDirectiveInner(trimmed)
+		if inner == "" {
+			return nil, fmt.Errorf("content outside of section directives is not allowed: %q", lines[i])
+		}
 
-		if strings.HasPrefix(directive, "section ") {
-			section, endIdx, err := parseSectionDirective(directive[len("section "):], lines, i)
+		keyword := directiveKeyword(inner)
+
+		switch keyword {
+		case "section":
+			params := strings.TrimSpace(strings.TrimPrefix(inner, "section"))
+			section, endIdx, err := parseSectionBlock(params, lines, i)
 			if err != nil {
 				return nil, err
 			}
 			result.Sections = append(result.Sections, section)
 			i = endIdx + 1
-			continue
-		}
 
-		if directive == "bootstrap" {
-			content, endIdx, err := parseBlockContent(lines, i)
+		case "bootstrap":
+			content, endIdx, err := collectBlockContent(lines, i, "endbootstrap")
 			if err != nil {
 				return nil, fmt.Errorf("bootstrap block: %w", err)
 			}
 			result.BootstrapContent = content
 			result.HasBootstrap = true
 			i = endIdx + 1
-			continue
-		}
 
-		return nil, fmt.Errorf("unknown directive: %q", line)
+		default:
+			return nil, fmt.Errorf("unexpected directive: %q", trimmed)
+		}
 	}
 
 	return result, nil
 }
 
-// parseSectionDirective parses a section directive's boundaries and content.
-func parseSectionDirective(params string, lines []string, startLine int) (Section, int, error) {
+// hasStructuralDirectives checks if any line in the template is a
+// structural directive (section or bootstrap).
+func hasStructuralDirectives(lines []string) bool {
+	for _, line := range lines {
+		inner := extractDirectiveInner(strings.TrimSpace(line))
+		if inner == "" {
+			continue
+		}
+		kw := directiveKeyword(inner)
+		if kw == "section" || kw == "bootstrap" {
+			return true
+		}
+	}
+	return false
+}
+
+// extractDirectiveInner extracts the inner content of a {{ }} directive
+// line with optional trim markers stripped. Returns empty string if the
+// line is not a directive (does not start with {{ and end with }}).
+func extractDirectiveInner(trimmed string) string {
+	if !strings.HasPrefix(trimmed, "{{") || !strings.HasSuffix(trimmed, "}}") {
+		return ""
+	}
+	inner := trimmed[2 : len(trimmed)-2]
+	inner = strings.TrimSpace(inner)
+	if strings.HasPrefix(inner, "-") {
+		inner = strings.TrimSpace(inner[1:])
+	}
+	if strings.HasSuffix(inner, "-") {
+		inner = strings.TrimSpace(inner[:len(inner)-1])
+	}
+	return inner
+}
+
+// directiveKeyword returns the first word of the directive inner text.
+func directiveKeyword(inner string) string {
+	parts := strings.Fields(inner)
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[0]
+}
+
+// parseSectionBlock parses a section directive and collects content until
+// {{ endsection }}.
+func parseSectionBlock(params string, lines []string, startLine int) (Section, int, error) {
 	start, end, err := parseSectionBoundaries(params)
 	if err != nil {
 		return Section{}, 0, fmt.Errorf("section directive: %w", err)
 	}
 
-	content, endIdx, err := parseBlockContent(lines, startLine)
+	content, endIdx, err := collectBlockContent(lines, startLine, "endsection")
 	if err != nil {
 		return Section{}, 0, fmt.Errorf("section block: %w", err)
+	}
+
+	// Process join blocks within the section content
+	processed, err := processJoinBlocks(content)
+	if err != nil {
+		return Section{}, 0, err
 	}
 
 	return Section{
 		Start:   start,
 		End:     end,
-		Content: content,
+		Content: processed,
 	}, endIdx, nil
 }
 
-// parseSectionBoundaries parses the start= and end= parameters from a section
-// directive line.
+// parseSectionBoundaries parses start= and end= parameters from a section
+// directive. Both, one, or the other can be specified. Missing start
+// defaults to start_of_file. Missing end defaults to end_of_file.
 func parseSectionBoundaries(params string) (Boundary, Boundary, error) {
 	params = strings.TrimSpace(params)
+	if params == "" {
+		return Boundary{}, Boundary{}, fmt.Errorf("section requires at least start or end parameter")
+	}
 
 	startStr, endStr, err := extractBoundaryParams(params)
 	if err != nil {
 		return Boundary{}, Boundary{}, err
 	}
 
-	start, err := parseBoundary(startStr)
-	if err != nil {
-		return Boundary{}, Boundary{}, fmt.Errorf("start boundary: %w", err)
+	var start Boundary
+	if startStr != "" {
+		start, err = parseBoundary(startStr)
+		if err != nil {
+			return Boundary{}, Boundary{}, fmt.Errorf("start boundary: %w", err)
+		}
+	} else {
+		start = Boundary{Type: boundaryStartOfFile}
 	}
 
-	end, err := parseBoundary(endStr)
-	if err != nil {
-		return Boundary{}, Boundary{}, fmt.Errorf("end boundary: %w", err)
+	var endBoundary Boundary
+	if endStr != "" {
+		endBoundary, err = parseBoundary(endStr)
+		if err != nil {
+			return Boundary{}, Boundary{}, fmt.Errorf("end boundary: %w", err)
+		}
+	} else {
+		endBoundary = Boundary{Type: boundaryEndOfFile}
 	}
 
-	return start, end, nil
+	return start, endBoundary, nil
 }
 
-// extractBoundaryParams extracts start= and end= values from the params
-// string. It handles quoted values with parentheses inside.
+// extractBoundaryParams extracts start= and end= values from a parameter
+// string. Either or both can be present.
 func extractBoundaryParams(params string) (string, string, error) {
 	var startVal, endVal string
 
-	// Parse key=value pairs, handling function-style values like content("text")
 	remaining := params
 	for remaining != "" {
 		remaining = strings.TrimSpace(remaining)
@@ -178,46 +232,50 @@ func extractBoundaryParams(params string) (string, string, error) {
 		}
 	}
 
-	if startVal == "" {
-		return "", "", fmt.Errorf("missing start parameter")
-	}
-	if endVal == "" {
-		return "", "", fmt.Errorf("missing end parameter")
+	if startVal == "" && endVal == "" {
+		return "", "", fmt.Errorf("section requires at least start or end parameter")
 	}
 
 	return startVal, endVal, nil
 }
 
-// extractParamValue extracts a boundary value from the params string.
-// It handles simple values like start_of_file and function-style like content("text").
+// extractParamValue extracts a boundary value from a parameter string.
+// Handles simple values like start_of_file and function-style values
+// like content("text") or line(3).
 func extractParamValue(s string) (string, string, error) {
 	s = strings.TrimSpace(s)
 
-	// Check for function-style: name("value")
 	for _, funcName := range []string{boundaryLine, boundaryContent, boundaryContains} {
 		prefix := funcName + "("
-		if strings.HasPrefix(s, prefix) {
-			// Find the closing quote and parenthesis
-			rest := s[len(prefix):]
-			if len(rest) < 3 || rest[0] != '"' {
-				return "", "", fmt.Errorf("expected quoted argument in %s()", funcName)
-			}
-			// Find closing ")"
+		if !strings.HasPrefix(s, prefix) {
+			continue
+		}
+		rest := s[len(prefix):]
+		if len(rest) == 0 {
+			return "", "", fmt.Errorf("empty argument in %s()", funcName)
+		}
+		if rest[0] == '"' {
 			endQuote := strings.Index(rest[1:], "\"")
 			if endQuote == -1 {
 				return "", "", fmt.Errorf("unterminated quoted argument in %s()", funcName)
 			}
-			endQuote++ // adjust for the offset
+			endQuote++ // adjust for offset
 			if endQuote+1 >= len(rest) || rest[endQuote+1] != ')' {
 				return "", "", fmt.Errorf("expected closing parenthesis in %s()", funcName)
 			}
-			value := s[:len(prefix)+endQuote+2] // include the closing )
+			value := s[:len(prefix)+endQuote+2]
 			remaining := s[len(prefix)+endQuote+2:]
 			return value, remaining, nil
 		}
+		closeParen := strings.Index(rest, ")")
+		if closeParen == -1 {
+			return "", "", fmt.Errorf("expected closing parenthesis in %s()", funcName)
+		}
+		value := s[:len(prefix)+closeParen+1]
+		remaining := s[len(prefix)+closeParen+1:]
+		return value, remaining, nil
 	}
 
-	// Simple value (no quotes/parens): read until whitespace
 	end := strings.IndexAny(s, " \t")
 	if end == -1 {
 		return s, "", nil
@@ -226,6 +284,8 @@ func extractParamValue(s string) (string, string, error) {
 }
 
 // parseBoundary parses a boundary specification string into a Boundary.
+// Supports start_of_file, end_of_file, line(N), content("text"), and
+// contains("text"). Quoted values in line() are optional.
 func parseBoundary(spec string) (Boundary, error) {
 	spec = strings.TrimSpace(spec)
 
@@ -236,68 +296,79 @@ func parseBoundary(spec string) (Boundary, error) {
 		return Boundary{Type: boundaryEndOfFile}, nil
 	}
 
-	// Check function-style boundaries
 	for _, funcName := range []string{boundaryLine, boundaryContent, boundaryContains} {
-		prefix := funcName + "(\""
-		suffix := "\")"
-		if strings.HasPrefix(spec, prefix) && strings.HasSuffix(spec, suffix) {
-			value := spec[len(prefix) : len(spec)-len(suffix)]
-			if funcName == boundaryLine {
-				if _, err := strconv.Atoi(value); err != nil {
-					return Boundary{}, fmt.Errorf("line boundary must be a number: %q", value)
-				}
-			}
-			return Boundary{Type: funcName, Value: value}, nil
+		prefix := funcName + "("
+		if !strings.HasPrefix(spec, prefix) || !strings.HasSuffix(spec, ")") {
+			continue
 		}
+		value := spec[len(prefix) : len(spec)-1]
+		if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
+			value = value[1 : len(value)-1]
+		}
+		if funcName == boundaryLine {
+			if _, err := strconv.Atoi(value); err != nil {
+				return Boundary{}, fmt.Errorf("line boundary must be a number: %q", value)
+			}
+		}
+		return Boundary{Type: funcName, Value: value}, nil
 	}
 
 	return Boundary{}, fmt.Errorf("unknown boundary: %q", spec)
 }
 
-// parseBlockContent reads lines from startLine+1 until a #!gitrepoforge:end
-// directive is found. Returns the content between the start and end directives
-// and the index of the end directive line.
-func parseBlockContent(lines []string, startLine int) (string, int, error) {
+// collectBlockContent reads lines from startLine+1 until a closing
+// directive with the given keyword is found. Returns the content between
+// the directives and the index of the closing directive line.
+func collectBlockContent(lines []string, startLine int, endKeyword string) (string, int, error) {
 	var contentLines []string
 	i := startLine + 1
 	for i < len(lines) {
 		trimmed := strings.TrimSpace(lines[i])
-		if trimmed == directiveEnd {
+		inner := extractDirectiveInner(trimmed)
+		if inner != "" && directiveKeyword(inner) == endKeyword {
 			return strings.Join(contentLines, "\n"), i, nil
 		}
 		contentLines = append(contentLines, lines[i])
 		i++
 	}
-	return "", 0, fmt.Errorf("unterminated block starting at line %d", startLine+1)
+	return "", 0, fmt.Errorf("unterminated block starting at line %d: expected {{ %s }}", startLine+1, endKeyword)
 }
 
-// processJoinBlocks finds all #!gitrepoforge:join ... #!gitrepoforge:end blocks
-// and replaces them with the content joined into a single line (newlines removed).
+// processJoinBlocks finds {{ join }}...{{ endjoin }} blocks within content
+// and replaces them with the content joined into a single line.
 func processJoinBlocks(content string) (string, error) {
-	joinDirective := directivePrefix + "join"
+	lines := strings.Split(content, "\n")
 
-	if !strings.Contains(content, joinDirective) {
+	hasJoin := false
+	for _, line := range lines {
+		inner := extractDirectiveInner(strings.TrimSpace(line))
+		if inner != "" && directiveKeyword(inner) == "join" {
+			hasJoin = true
+			break
+		}
+	}
+	if !hasJoin {
 		return content, nil
 	}
 
-	lines := strings.Split(content, "\n")
 	var result []string
 	i := 0
 	for i < len(lines) {
 		trimmed := strings.TrimSpace(lines[i])
-		if trimmed == joinDirective {
-			// Collect lines until #!gitrepoforge:end
+		inner := extractDirectiveInner(trimmed)
+		if inner != "" && directiveKeyword(inner) == "join" {
 			i++
 			var joinedParts []string
 			found := false
 			for i < len(lines) {
 				trimmedInner := strings.TrimSpace(lines[i])
-				if trimmedInner == directiveEnd {
+				innerJoin := extractDirectiveInner(trimmedInner)
+				if innerJoin != "" && directiveKeyword(innerJoin) == "endjoin" {
 					found = true
 					break
 				}
-				// Strip trailing \r left over from \r\n line endings since
-				// lines are already split on \n
+				// Strip trailing \r left over from \r\n line endings
+				// since lines are already split on \n
 				line := strings.TrimRight(lines[i], "\r")
 				if line != "" {
 					joinedParts = append(joinedParts, line)
@@ -321,8 +392,8 @@ func processJoinBlocks(content string) (string, error) {
 }
 
 // applySections applies the parsed section directives to an existing file.
-// If the file does not exist (fileContent is empty string with fileExists=false),
-// it creates the initial content from sections and bootstrap content.
+// If the file does not exist, it creates the initial content from sections
+// and bootstrap content.
 func applySections(parsed *ParsedTemplate, fileContent string, fileExists bool) (string, error) {
 	if !fileExists {
 		return buildNewFileFromSections(parsed)
@@ -332,8 +403,7 @@ func applySections(parsed *ParsedTemplate, fileContent string, fileExists bool) 
 }
 
 // buildNewFileFromSections creates initial file content from sections and
-// bootstrap content. Sections are concatenated in order, with bootstrap
-// content placed between sections (in the order it appears in the template).
+// bootstrap content.
 func buildNewFileFromSections(parsed *ParsedTemplate) (string, error) {
 	var parts []string
 
@@ -362,7 +432,6 @@ func applyToExistingFile(parsed *ParsedTemplate, fileContent string) (string, er
 	trailingNewline := strings.HasSuffix(fileContent, "\n")
 	lines := strings.Split(fileContent, "\n")
 
-	// Apply each section in order
 	for _, section := range parsed.Sections {
 		startIdx, err := resolveBoundary(section.Start, lines, 0)
 		if err != nil {
@@ -375,7 +444,6 @@ func applyToExistingFile(parsed *ParsedTemplate, fileContent string) (string, er
 			return "", fmt.Errorf("resolving end boundary: %w", err)
 		}
 
-		// Replace lines from startIdx to endIdx (inclusive) with section content
 		sectionLines := strings.Split(section.Content, "\n")
 		var newLines []string
 		newLines = append(newLines, lines[:startIdx]...)
@@ -388,7 +456,6 @@ func applyToExistingFile(parsed *ParsedTemplate, fileContent string) (string, er
 
 	result := strings.Join(lines, "\n")
 
-	// Preserve the original file's trailing newline convention
 	if trailingNewline && !strings.HasSuffix(result, "\n") {
 		result += "\n"
 	}
@@ -397,8 +464,6 @@ func applyToExistingFile(parsed *ParsedTemplate, fileContent string) (string, er
 }
 
 // resolveBoundary finds the line index for a boundary in the given lines.
-// searchFrom is used for end boundaries to start searching from the start
-// boundary position.
 func resolveBoundary(b Boundary, lines []string, searchFrom int) (int, error) {
 	switch b.Type {
 	case boundaryStartOfFile:
@@ -411,8 +476,8 @@ func resolveBoundary(b Boundary, lines []string, searchFrom int) (int, error) {
 		return len(lines) - 1, nil
 
 	case boundaryLine:
-		lineNum, _ := strconv.Atoi(b.Value) // already validated in parse
-		idx := lineNum - 1                   // convert to 0-based
+		lineNum, _ := strconv.Atoi(b.Value)
+		idx := lineNum - 1
 		if idx < 0 || idx >= len(lines) {
 			return 0, fmt.Errorf("line number %d is out of range (file has %d lines)", lineNum, len(lines))
 		}

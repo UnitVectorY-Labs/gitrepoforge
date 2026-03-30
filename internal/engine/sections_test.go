@@ -18,23 +18,28 @@ func TestProcessJoinBlocks(t *testing.T) {
 		},
 		{
 			name:  "simple join",
-			input: "#!gitrepoforge:join\na\nb\nc\n#!gitrepoforge:end",
+			input: "{{ join }}\na\nb\nc\n{{ endjoin }}",
 			want:  "abc",
 		},
 		{
 			name:  "join within other content",
-			input: "before\n#!gitrepoforge:join\na\nb\n#!gitrepoforge:end\nafter",
+			input: "before\n{{ join }}\na\nb\n{{ endjoin }}\nafter",
 			want:  "before\nab\nafter",
 		},
 		{
 			name:  "join with empty lines skipped",
-			input: "#!gitrepoforge:join\na\n\nb\n#!gitrepoforge:end",
+			input: "{{ join }}\na\n\nb\n{{ endjoin }}",
 			want:  "ab",
 		},
 		{
 			name:    "unterminated join",
-			input:   "#!gitrepoforge:join\na\nb",
+			input:   "{{ join }}\na\nb",
 			wantErr: true,
+		},
+		{
+			name:  "join with trim markers",
+			input: "{{- join -}}\na\nb\n{{- endjoin -}}",
+			want:  "ab",
 		},
 	}
 
@@ -69,7 +74,12 @@ func TestParseBoundary(t *testing.T) {
 			want:  Boundary{Type: boundaryEndOfFile},
 		},
 		{
-			name:  "line number",
+			name:  "line number unquoted",
+			input: `line(5)`,
+			want:  Boundary{Type: boundaryLine, Value: "5"},
+		},
+		{
+			name:  "line number quoted",
 			input: `line("5")`,
 			want:  Boundary{Type: boundaryLine, Value: "5"},
 		},
@@ -110,14 +120,67 @@ func TestParseBoundary(t *testing.T) {
 	}
 }
 
+func TestExtractDirectiveInner(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "section directive",
+			input: `{{ section start=start_of_file end=end_of_file }}`,
+			want:  "section start=start_of_file end=end_of_file",
+		},
+		{
+			name:  "with leading trim",
+			input: `{{- section start=start_of_file }}`,
+			want:  "section start=start_of_file",
+		},
+		{
+			name:  "with trailing trim",
+			input: `{{ endsection -}}`,
+			want:  "endsection",
+		},
+		{
+			name:  "with both trims",
+			input: `{{- bootstrap -}}`,
+			want:  "bootstrap",
+		},
+		{
+			name:  "not a directive",
+			input: "# some content",
+			want:  "",
+		},
+		{
+			name:  "go template expression",
+			input: "{{ .Name }}",
+			want:  ".Name",
+		},
+		{
+			name:  "endsection",
+			input: "{{ endsection }}",
+			want:  "endsection",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractDirectiveInner(tt.input)
+			if got != tt.want {
+				t.Fatalf("extractDirectiveInner(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseTemplateDirectives(t *testing.T) {
 	tests := []struct {
-		name       string
-		input      string
-		wantWhole  bool
-		wantSecs   int
-		wantBoot   bool
-		wantErr    bool
+		name      string
+		input     string
+		wantWhole bool
+		wantSecs  int
+		wantBoot  bool
+		wantErr   bool
 	}{
 		{
 			name:      "no directives returns whole file",
@@ -126,58 +189,72 @@ func TestParseTemplateDirectives(t *testing.T) {
 		},
 		{
 			name: "single section",
-			input: `#!gitrepoforge:section start=start_of_file end=contains("<!-- END -->")
-# Header
-<!-- END -->
-#!gitrepoforge:end`,
+			input: "{{ section start=start_of_file end=contains(\"<!-- END -->\") }}\n" +
+				"# Header\n" +
+				"<!-- END -->\n" +
+				"{{ endsection }}",
 			wantSecs: 1,
 		},
 		{
 			name: "section with bootstrap",
-			input: `#!gitrepoforge:section start=start_of_file end=contains("<!-- END -->")
-# Header
-<!-- END -->
-#!gitrepoforge:end
-#!gitrepoforge:bootstrap
-Default body
-#!gitrepoforge:end`,
+			input: "{{ section start=start_of_file end=contains(\"<!-- END -->\") }}\n" +
+				"# Header\n" +
+				"<!-- END -->\n" +
+				"{{ endsection }}\n" +
+				"{{ bootstrap }}\n" +
+				"Default body\n" +
+				"{{ endbootstrap }}",
 			wantSecs: 1,
 			wantBoot: true,
 		},
 		{
 			name: "multiple sections",
-			input: `#!gitrepoforge:section start=start_of_file end=content("<!-- DIVIDER -->")
-Header
-<!-- DIVIDER -->
-#!gitrepoforge:end
-#!gitrepoforge:section start=contains("<!-- FOOTER -->") end=end_of_file
-<!-- FOOTER -->
-Footer
-#!gitrepoforge:end`,
+			input: "{{ section start=start_of_file end=content(\"<!-- DIVIDER -->\") }}\n" +
+				"Header\n" +
+				"<!-- DIVIDER -->\n" +
+				"{{ endsection }}\n" +
+				"{{ section start=contains(\"<!-- FOOTER -->\") end=end_of_file }}\n" +
+				"<!-- FOOTER -->\n" +
+				"Footer\n" +
+				"{{ endsection }}",
 			wantSecs: 2,
 		},
 		{
 			name: "bootstrap only",
-			input: `#!gitrepoforge:bootstrap
-some content
-#!gitrepoforge:end`,
+			input: "{{ bootstrap }}\n" +
+				"some content\n" +
+				"{{ endbootstrap }}",
 			wantBoot: true,
 		},
 		{
 			name:    "content outside sections is error",
-			input:   "some content\n#!gitrepoforge:section start=start_of_file end=end_of_file\ncontent\n#!gitrepoforge:end",
+			input:   "some content\n{{ section start=start_of_file end=end_of_file }}\ncontent\n{{ endsection }}",
 			wantErr: true,
 		},
 		{
 			name: "empty bootstrap",
-			input: `#!gitrepoforge:bootstrap
-#!gitrepoforge:end`,
+			input: "{{ bootstrap }}\n" +
+				"{{ endbootstrap }}",
 			wantBoot: true,
 		},
 		{
 			name:    "unterminated section",
-			input:   "#!gitrepoforge:section start=start_of_file end=end_of_file\ncontent",
+			input:   "{{ section start=start_of_file end=end_of_file }}\ncontent",
 			wantErr: true,
+		},
+		{
+			name: "section with only start boundary",
+			input: "{{ section start=start_of_file }}\n" +
+				"content\n" +
+				"{{ endsection }}",
+			wantSecs: 1,
+		},
+		{
+			name: "section with only end boundary",
+			input: "{{ section end=end_of_file }}\n" +
+				"content\n" +
+				"{{ endsection }}",
+			wantSecs: 1,
 		},
 	}
 
@@ -198,6 +275,61 @@ some content
 			}
 			if got.HasBootstrap != tt.wantBoot {
 				t.Fatalf("HasBootstrap = %v, want %v", got.HasBootstrap, tt.wantBoot)
+			}
+		})
+	}
+}
+
+func TestParseSectionBoundaryDefaults(t *testing.T) {
+	tests := []struct {
+		name      string
+		params    string
+		wantStart string
+		wantEnd   string
+	}{
+		{
+			name:      "both specified",
+			params:    "start=start_of_file end=end_of_file",
+			wantStart: boundaryStartOfFile,
+			wantEnd:   boundaryEndOfFile,
+		},
+		{
+			name:      "only start defaults end to end_of_file",
+			params:    "start=start_of_file",
+			wantStart: boundaryStartOfFile,
+			wantEnd:   boundaryEndOfFile,
+		},
+		{
+			name:      "only end defaults start to start_of_file",
+			params:    "end=end_of_file",
+			wantStart: boundaryStartOfFile,
+			wantEnd:   boundaryEndOfFile,
+		},
+		{
+			name:      "start with contains end",
+			params:    `start=start_of_file end=contains("marker")`,
+			wantStart: boundaryStartOfFile,
+			wantEnd:   boundaryContains,
+		},
+		{
+			name:      "only end with contains",
+			params:    `end=contains("marker")`,
+			wantStart: boundaryStartOfFile,
+			wantEnd:   boundaryContains,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			start, end, err := parseSectionBoundaries(tt.params)
+			if err != nil {
+				t.Fatalf("parseSectionBoundaries() error = %v", err)
+			}
+			if start.Type != tt.wantStart {
+				t.Fatalf("start.Type = %q, want %q", start.Type, tt.wantStart)
+			}
+			if end.Type != tt.wantEnd {
+				t.Fatalf("end.Type = %q, want %q", end.Type, tt.wantEnd)
 			}
 		})
 	}
@@ -239,19 +371,19 @@ func TestResolveBoundary(t *testing.T) {
 			wantIdx:  3,
 		},
 		{
-			name:       "content not found",
-			boundary:   Boundary{Type: boundaryContent, Value: "missing"},
-			wantErr:    true,
+			name:    "content not found",
+			boundary: Boundary{Type: boundaryContent, Value: "missing"},
+			wantErr: true,
 		},
 		{
-			name:       "contains not found",
-			boundary:   Boundary{Type: boundaryContains, Value: "missing"},
-			wantErr:    true,
+			name:    "contains not found",
+			boundary: Boundary{Type: boundaryContains, Value: "missing"},
+			wantErr: true,
 		},
 		{
-			name:       "line out of range",
-			boundary:   Boundary{Type: boundaryLine, Value: "10"},
-			wantErr:    true,
+			name:    "line out of range",
+			boundary: Boundary{Type: boundaryLine, Value: "10"},
+			wantErr: true,
 		},
 		{
 			name:       "contains with search from",
@@ -276,12 +408,12 @@ func TestResolveBoundary(t *testing.T) {
 
 func TestApplySections(t *testing.T) {
 	tests := []struct {
-		name       string
-		parsed     *ParsedTemplate
-		content    string
-		exists     bool
-		want       string
-		wantErr    bool
+		name    string
+		parsed  *ParsedTemplate
+		content string
+		exists  bool
+		want    string
+		wantErr bool
 	}{
 		{
 			name: "new file with section",
