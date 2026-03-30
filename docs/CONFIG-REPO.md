@@ -278,10 +278,10 @@ templates:
 **`templates/README.md.tmpl`**
 
 ```text
-#!gitrepoforge:section start=start_of_file end=contains("<!-- END MANAGED -->")
+{{ section start=start_of_file end=contains("<!-- END MANAGED -->") }}
 # My Project
 <!-- END MANAGED -->
-#!gitrepoforge:end
+{{ endsection }}
 ```
 
 Ensure a file exists without managing its content. Useful for files like `go.sum` that should be present but are maintained by other tools:
@@ -297,8 +297,8 @@ templates:
 **`templates/go.sum.tmpl`**
 
 ```text
-#!gitrepoforge:bootstrap
-#!gitrepoforge:end
+{{ bootstrap }}
+{{ endbootstrap }}
 ```
 
 Manage both a header and footer while preserving user content in between:
@@ -306,14 +306,14 @@ Manage both a header and footer while preserving user content in between:
 **`templates/README.md.tmpl`**
 
 ```text
-#!gitrepoforge:section start=start_of_file end=content("<!-- END HEADER -->")
+{{ section start=start_of_file end=content("<!-- END HEADER -->") }}
 # Managed Header
 <!-- END HEADER -->
-#!gitrepoforge:end
-#!gitrepoforge:section start=contains("<!-- START FOOTER -->") end=end_of_file
+{{ endsection }}
+{{ section start=contains("<!-- START FOOTER -->") end=end_of_file }}
 <!-- START FOOTER -->
 Managed Footer Content
-#!gitrepoforge:end
+{{ endsection }}
 ```
 
 Provide default body content on first creation, then manage only the header afterwards:
@@ -321,13 +321,13 @@ Provide default body content on first creation, then manage only the header afte
 **`templates/README.md.tmpl`**
 
 ```text
-#!gitrepoforge:section start=start_of_file end=contains("<!-- END MANAGED -->")
+{{ section start=start_of_file end=contains("<!-- END MANAGED -->") }}
 # Managed Header
 <!-- END MANAGED -->
-#!gitrepoforge:end
-#!gitrepoforge:bootstrap
+{{ endsection }}
+{{ bootstrap }}
 Default body content goes here.
-#!gitrepoforge:end
+{{ endbootstrap }}
 ```
 
 ## `templates/`

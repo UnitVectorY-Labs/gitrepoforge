@@ -1,8 +1,8 @@
-#!gitrepoforge:section start=start_of_file end=content("<!-- END HEADER -->")
+{{ section start=start_of_file end=content("<!-- END HEADER -->") }}
 # Managed Header
 <!-- END HEADER -->
-#!gitrepoforge:end
-#!gitrepoforge:section start=contains("<!-- START FOOTER -->") end=end_of_file
+{{ endsection }}
+{{ section start=contains("<!-- START FOOTER -->") end=end_of_file }}
 <!-- START FOOTER -->
 Managed Footer Content
-#!gitrepoforge:end
+{{ endsection }}

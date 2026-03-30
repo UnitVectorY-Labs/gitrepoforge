@@ -1,7 +1,7 @@
-#!gitrepoforge:section start=start_of_file end=contains("<!-- END BADGES -->")
-#!gitrepoforge:join
+{{ section start=start_of_file end=contains("<!-- END BADGES -->") }}
+{{ join }}
 [![Build](https://img.shields.io/badge/build-passing-green)]
 [![Coverage](https://img.shields.io/badge/coverage-100%25-green)]
-#!gitrepoforge:end
+{{ endjoin }}
 <!-- END BADGES -->
-#!gitrepoforge:end
+{{ endsection }}

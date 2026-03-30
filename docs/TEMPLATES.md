@@ -129,10 +129,12 @@ Section directives let a template manage specific regions of a file instead of r
 
 | Directive | Description |
 |-----------|-------------|
-| `#!gitrepoforge:section start=<boundary> end=<boundary>` | Defines a managed section of the file. |
-| `#!gitrepoforge:bootstrap` | Content only added when the file is first created. |
-| `#!gitrepoforge:join` | Joins enclosed lines into a single line by removing newlines. |
-| `#!gitrepoforge:end` | Ends a section, bootstrap, or join block. |
+| `{{ section start=<boundary> end=<boundary> }}` | Defines a managed section of the file. |
+| `{{ bootstrap }}` | Content only added when the file is first created. |
+| `{{ join }}` | Joins enclosed lines into a single line by removing newlines. |
+| `{{ endsection }}` | Ends a section block. |
+| `{{ endbootstrap }}` | Ends a bootstrap block. |
+| `{{ endjoin }}` | Ends a join block. |
 
 ### Boundary Types
 
@@ -142,7 +144,7 @@ Boundaries define where a managed section starts and ends in the target file:
 |----------|-------------|
 | `start_of_file` | Beginning of the file. |
 | `end_of_file` | End of the file. |
-| `line("N")` | Specific line number (1-based). |
+| `line(N)` | Specific line number (1-based). |
 | `content("text")` | Exact line match after trimming whitespace. |
 | `contains("text")` | Line that contains the given text. |
 
@@ -154,91 +156,91 @@ Boundaries define where a managed section starts and ends in the target file:
 
 **Join blocks:** Lines inside a join block are concatenated with newlines removed, producing a single line. Join blocks can appear inside section blocks.
 
-The `#!gitrepoforge:end` directive does not produce a trailing newline in the section content. This means the last line of a section block is included without an extra newline appended after it. For example, a section containing two lines produces content equivalent to `"line1\nline2"` rather than `"line1\nline2\n"`.
+The `{{ endsection }}` directive does not produce a trailing newline in the section content. This means the last line of a section block is included without an extra newline appended after it. For example, a section containing two lines produces content equivalent to `"line1\nline2"` rather than `"line1\nline2\n"`.
 
 ### Examples
 
 Manage the header of a README while preserving user content below it:
 
 ```text
-#!gitrepoforge:section start=start_of_file end=contains("<!-- END MANAGED -->")
+{{ section start=start_of_file end=contains("<!-- END MANAGED -->") }}
 # My Project
 <!-- END MANAGED -->
-#!gitrepoforge:end
+{{ endsection }}
 ```
 
 Create a file only on first run (bootstrap), then leave it alone:
 
 ```text
-#!gitrepoforge:bootstrap
-#!gitrepoforge:end
+{{ bootstrap }}
+{{ endbootstrap }}
 ```
 
 Join badge images onto a single line:
 
 ```text
-#!gitrepoforge:section start=start_of_file end=contains("<!-- END BADGES -->")
-#!gitrepoforge:join
+{{ section start=start_of_file end=contains("<!-- END BADGES -->") }}
+{{ join }}
 [![Build](https://img.shields.io/badge/build-passing-green)]
 [![Coverage](https://img.shields.io/badge/coverage-100%25-green)]
-#!gitrepoforge:end
+{{ endjoin }}
 <!-- END BADGES -->
-#!gitrepoforge:end
+{{ endsection }}
 ```
 
 Manage multiple sections (header and footer) while preserving everything in between:
 
 ```text
-#!gitrepoforge:section start=start_of_file end=content("<!-- END HEADER -->")
+{{ section start=start_of_file end=content("<!-- END HEADER -->") }}
 # Managed Header
 <!-- END HEADER -->
-#!gitrepoforge:end
-#!gitrepoforge:section start=contains("<!-- START FOOTER -->") end=end_of_file
+{{ endsection }}
+{{ section start=contains("<!-- START FOOTER -->") end=end_of_file }}
 <!-- START FOOTER -->
 Managed Footer Content
-#!gitrepoforge:end
+{{ endsection }}
 ```
 
 {% raw %}
 Use `evaluate: true` with section directives for template rendering inside sections:
 
 ```text
-#!gitrepoforge:section start=start_of_file end=contains("<!-- END MANAGED -->")
+{{ section start=start_of_file end=contains("<!-- END MANAGED -->") }}
 # {{ .Name }}
 <!-- END MANAGED -->
-#!gitrepoforge:end
+{{ endsection }}
 ```
 {% endraw %}
 
 Manage only the footer of a file, preserving user content above:
 
 ```text
-#!gitrepoforge:section start=contains("<!-- START FOOTER -->") end=end_of_file
+{{ section start=contains("<!-- START FOOTER -->") end=end_of_file }}
 <!-- START FOOTER -->
 Managed Footer
-#!gitrepoforge:end
+{{ endsection }}
 ```
 
-Use `line("N")` to manage a fixed number of lines at the top of a file:
+Use `line(N)` to manage a fixed number of lines at the top of a file:
 
 ```text
-#!gitrepoforge:section start=start_of_file end=line("3")
+{{ section start=start_of_file end=line(3) }}
 Line 1 managed
 Line 2 managed
 Line 3 managed
-#!gitrepoforge:end
+{{ endsection }}
 ```
 
 Combine a managed header section with bootstrap content that only appears when the file is first created:
 
 ```text
-#!gitrepoforge:section start=start_of_file end=contains("<!-- END MANAGED -->")
+{{ section start=start_of_file end=contains("<!-- END MANAGED -->") }}
 # Managed Header
 <!-- END MANAGED -->
-#!gitrepoforge:end
-#!gitrepoforge:bootstrap
+{{ endsection }}
+{{ bootstrap }}
 Default body content goes here.
-#!gitrepoforge:end
+{{ endbootstrap }}
 ```
 
 When this template creates a new file, the result includes both the header section and the bootstrap text. On subsequent runs, only the header section is managed and the bootstrap text is ignored, allowing the user to replace the default body with their own content.
