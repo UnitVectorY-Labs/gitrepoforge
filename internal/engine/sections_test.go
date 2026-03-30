@@ -99,6 +99,16 @@ func TestParseBoundary(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "empty line argument",
+			input:   `line()`,
+			wantErr: true,
+		},
+		{
+			name:    "empty content argument",
+			input:   `content()`,
+			wantErr: true,
+		},
+		{
 			name:    "unknown boundary",
 			input:   "foobar",
 			wantErr: true,

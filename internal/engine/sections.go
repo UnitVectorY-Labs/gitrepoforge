@@ -301,6 +301,9 @@ func parseBoundary(spec string) (Boundary, error) {
 		if !strings.HasPrefix(spec, prefix) || !strings.HasSuffix(spec, ")") {
 			continue
 		}
+		if len(spec) <= len(prefix)+1 {
+			return Boundary{}, fmt.Errorf("empty argument in %s()", funcName)
+		}
 		value := spec[len(prefix) : len(spec)-1]
 		if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
 			value = value[1 : len(value)-1]
