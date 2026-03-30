@@ -296,7 +296,8 @@ func processJoinBlocks(content string) (string, error) {
 					found = true
 					break
 				}
-				// Remove \r and \n from lines and join them
+				// Strip trailing \r left over from \r\n line endings since
+				// lines are already split on \n
 				line := strings.TrimRight(lines[i], "\r")
 				if line != "" {
 					joinedParts = append(joinedParts, line)
@@ -419,7 +420,7 @@ func resolveBoundary(b Boundary, lines []string, searchFrom int) (int, error) {
 
 	case boundaryContent:
 		for i := searchFrom; i < len(lines); i++ {
-			if strings.TrimSpace(lines[i]) == b.Value {
+			if strings.TrimSpace(lines[i]) == strings.TrimSpace(b.Value) {
 				return i, nil
 			}
 		}
