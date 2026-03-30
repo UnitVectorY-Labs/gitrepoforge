@@ -154,7 +154,7 @@ Boundaries define where a managed section starts and ends in the target file:
 
 **Join blocks:** Lines inside a join block are concatenated with newlines removed, producing a single line. Join blocks can appear inside section blocks.
 
-The `#!gitrepoforge:end` directive does not produce a trailing newline in the section content.
+The `#!gitrepoforge:end` directive does not produce a trailing newline in the section content. This means the last line of a section block is included without an extra newline appended after it. For example, a section containing two lines produces content equivalent to `"line1\nline2"` rather than `"line1\nline2\n"`.
 
 ### Examples
 

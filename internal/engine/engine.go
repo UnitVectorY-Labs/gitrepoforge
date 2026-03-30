@@ -101,11 +101,25 @@ func evaluateCreateRule(rule config.FileRule, data TemplateData, repoPath string
 		return evaluateDeleteRule(rule, repoPath)
 	}
 
-	expected, err := materializeTemplateFile(selected, data)
+	materialized, err := materializeTemplateFile(selected, data)
 	if err != nil {
 		return nil, err
 	}
 
+	// Parse section directives from the materialized template
+	parsed, err := parseTemplateDirectives(materialized)
+	if err != nil {
+		return nil, fmt.Errorf("parsing template directives for %s: %w", rule.Path, err)
+	}
+
+	if parsed.IsWholeFile {
+		return evaluateWholeFileRule(rule, parsed.OriginalContent, repoPath)
+	}
+
+	return evaluateSectionRule(rule, parsed, repoPath)
+}
+
+func evaluateWholeFileRule(rule config.FileRule, expected string, repoPath string) ([]Finding, error) {
 	filePath := filepath.Join(repoPath, rule.Path)
 	actual, err := os.ReadFile(filePath)
 	if err != nil {
@@ -118,6 +132,45 @@ func evaluateCreateRule(rule config.FileRule, data TemplateData, repoPath string
 			}}, nil
 		}
 		return nil, fmt.Errorf("failed to read %s: %w", filePath, err)
+	}
+
+	if string(actual) != expected {
+		return []Finding{{
+			FilePath:  rule.Path,
+			Operation: "update",
+			Message:   "file content differs from expected",
+			Expected:  expected,
+			Actual:    string(actual),
+		}}, nil
+	}
+
+	return nil, nil
+}
+
+func evaluateSectionRule(rule config.FileRule, parsed *ParsedTemplate, repoPath string) ([]Finding, error) {
+	filePath := filepath.Join(repoPath, rule.Path)
+	actual, err := os.ReadFile(filePath)
+	fileExists := true
+	if err != nil {
+		if os.IsNotExist(err) {
+			fileExists = false
+		} else {
+			return nil, fmt.Errorf("failed to read %s: %w", filePath, err)
+		}
+	}
+
+	expected, err := applySections(parsed, string(actual), fileExists)
+	if err != nil {
+		return nil, fmt.Errorf("applying sections to %s: %w", rule.Path, err)
+	}
+
+	if !fileExists {
+		return []Finding{{
+			FilePath:  rule.Path,
+			Operation: "create",
+			Message:   "file does not exist but should",
+			Expected:  expected,
+		}}, nil
 	}
 
 	if string(actual) != expected {
