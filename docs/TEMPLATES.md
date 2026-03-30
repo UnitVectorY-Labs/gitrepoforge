@@ -209,3 +209,43 @@ Use `evaluate: true` with section directives for template rendering inside secti
 #!gitrepoforge:end
 ```
 {% endraw %}
+
+Manage only the footer of a file, preserving user content above:
+
+```text
+#!gitrepoforge:section start=contains("<!-- START FOOTER -->") end=end_of_file
+<!-- START FOOTER -->
+Managed Footer
+#!gitrepoforge:end
+```
+
+Use `line("N")` to manage a fixed number of lines at the top of a file:
+
+```text
+#!gitrepoforge:section start=start_of_file end=line("3")
+Line 1 managed
+Line 2 managed
+Line 3 managed
+#!gitrepoforge:end
+```
+
+Combine a managed header section with bootstrap content that only appears when the file is first created:
+
+```text
+#!gitrepoforge:section start=start_of_file end=contains("<!-- END MANAGED -->")
+# Managed Header
+<!-- END MANAGED -->
+#!gitrepoforge:end
+#!gitrepoforge:bootstrap
+Default body content goes here.
+#!gitrepoforge:end
+```
+
+When this template creates a new file, the result includes both the header section and the bootstrap text. On subsequent runs, only the header section is managed and the bootstrap text is ignored, allowing the user to replace the default body with their own content.
+
+### Error Handling
+
+If a section directive references a boundary that cannot be found in an existing file, the operation fails with an error. This ensures that managed sections are only applied when the file structure matches expectations.
+
+Content outside of section, bootstrap, or join blocks in a template that uses directives is not allowed and produces an error. Blank lines between blocks are permitted.
+
