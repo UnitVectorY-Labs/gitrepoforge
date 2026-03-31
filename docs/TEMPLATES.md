@@ -270,6 +270,21 @@ Line 3 managed
 {% endraw %}
 
 {% raw %}
+Manage the first four lines of a `go.mod` to control the module path and Go version while preserving the `require` block:
+
+```text
+{{ section start=start_of_file end=line(4) }}
+module github.com/my-org/{{ .Name }}
+
+go 1.21
+
+{{ end }}
+```
+{% endraw %}
+
+With `evaluate: true` in the output configuration, `{{ "{{ .Name }}" }}` is replaced with the repository name.
+
+{% raw %}
 Combine a managed header section with bootstrap content that only appears when the file is first created:
 
 ```text
