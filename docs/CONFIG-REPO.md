@@ -85,15 +85,49 @@ description: Canonical docs hostname.
 | `required` | no | If true, the repo must provide the key unless a `default` is defined. |
 | `default` | no | Typed default value used when the repo omits the key. |
 | `enum` | no | Allowed values for `string` definitions. |
+| `pattern` | no | Regex with named capture groups for `string` definitions. Used for input validation and to extract named parts accessible in templates via the `capture` function. |
 | `description` | no | Human-readable description. |
 
 ### Type Notes
 
-- `string` accepts YAML strings and may also use `enum`.
+- `string` accepts YAML strings and may also use `enum` and/or `pattern`.
 - `boolean` accepts `true` or `false`.
 - `number` accepts numeric YAML values.
 - `list` accepts YAML sequences.
 - `object` accepts YAML mappings. Nested attributes are loaded from `config/<key>/` using the same per-file format as top-level definitions.
+
+### Pattern Matching
+
+The `pattern` field accepts a regular expression with named capture groups using the `(?P<name>...)` syntax. It is only supported for `string` definitions.
+
+When a pattern is defined:
+
+- The value provided by the repo (or the default) must match the pattern. A validation error is produced if it does not.
+- Named capture groups are extracted from the matched value and made available to templates through the `capture` function.
+
+The pattern must contain at least one named capture group. If a `default` is also set, the default value must match the pattern.
+
+**`config/goversion.yaml`**
+
+```yaml
+type: string
+required: false
+default: "1.26.1"
+pattern: "^(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)$"
+description: "The version of Go."
+```
+
+With the value `1.26.1`, the named groups resolve to:
+
+| Group | Value |
+|-------|-------|
+| `major` | `1` |
+| `minor` | `26` |
+| `patch` | `1` |
+
+Templates can then use `capture` to access individual groups. See [Template Files](/templates#capture-function) for usage details.
+
+`pattern` and `enum` may be combined. The value must satisfy both constraints.
 
 ### Reserved Config Keys
 

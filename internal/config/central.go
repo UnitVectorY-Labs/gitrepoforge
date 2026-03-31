@@ -491,14 +491,17 @@ func validateDefaultValue(def ConfigDefinition) error {
 			return fmt.Errorf("default must be a string")
 		}
 		if len(def.Enum) > 0 {
+			found := false
 			for _, allowed := range def.Enum {
 				if allowed == value {
-					goto enumOk
+					found = true
+					break
 				}
 			}
-			return fmt.Errorf("default %q is not one of: %s", value, strings.Join(def.Enum, ", "))
+			if !found {
+				return fmt.Errorf("default %q is not one of: %s", value, strings.Join(def.Enum, ", "))
+			}
 		}
-	enumOk:
 		if def.CompiledPattern != nil && !def.CompiledPattern.MatchString(value) {
 			return fmt.Errorf("default %q does not match pattern %q", value, def.Pattern)
 		}
