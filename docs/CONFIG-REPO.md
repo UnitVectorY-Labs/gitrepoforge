@@ -261,6 +261,83 @@ Use parentheses when grouping is needed, for example `(docs.enabled || preview_d
 
 `mode: delete` is still available when a file is always forbidden and does not need conditional selection.
 
+### Section-Based Patterns
+
+Templates can use section directives to manage only part of a file instead of replacing the entire file. The directives are placed in the template file itself. See [Template Files](/templates#section-directives) for the full directive reference.
+
+Manage a README header while letting users write the body:
+
+**`outputs/README.md.gitrepoforge`**
+
+```yaml
+templates:
+  - condition: readme
+    template: README.md.tmpl
+```
+
+**`templates/README.md.tmpl`**
+
+{% raw %}
+```text
+{{ section start=start_of_file end=contains("<!-- END MANAGED -->") }}
+# My Project
+<!-- END MANAGED -->
+{{ end }}
+```
+{% endraw %}
+
+Ensure a file exists without managing its content. Useful for files like `go.sum` that should be present but are maintained by other tools:
+
+**`outputs/go.sum.gitrepoforge`**
+
+```yaml
+templates:
+  - condition: manage_gosum
+    template: go.sum.tmpl
+```
+
+**`templates/go.sum.tmpl`**
+
+{% raw %}
+```text
+{{ bootstrap }}
+{{ end }}
+```
+{% endraw %}
+
+Manage both a header and footer while preserving user content in between:
+
+**`templates/README.md.tmpl`**
+
+{% raw %}
+```text
+{{ section start=start_of_file end=content("<!-- END HEADER -->") }}
+# Managed Header
+<!-- END HEADER -->
+{{ end }}
+{{ section start=contains("<!-- START FOOTER -->") end=end_of_file }}
+<!-- START FOOTER -->
+Managed Footer Content
+{{ end }}
+```
+{% endraw %}
+
+Provide default body content on first creation, then manage only the header afterwards:
+
+**`templates/README.md.tmpl`**
+
+{% raw %}
+```text
+{{ section start=start_of_file end=contains("<!-- END MANAGED -->") }}
+# Managed Header
+<!-- END MANAGED -->
+{{ end }}
+{{ bootstrap }}
+Default body content goes here.
+{{ end }}
+```
+{% endraw %}
+
 ## `templates/`
 
 The `templates/` folder stores the file content referenced by output rules. See [Template Files](/templates) for rendering details.
