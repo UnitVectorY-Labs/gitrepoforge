@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// GitConfig controls the Git automation performed during apply and bootstrap.
+// GitConfig controls the Git automation performed during apply.
 // It mirrors the git configuration section from the repver tool.
 type GitConfig struct {
 	CreateBranch           bool   `yaml:"create_branch"`

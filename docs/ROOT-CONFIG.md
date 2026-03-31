@@ -39,7 +39,7 @@ delete_branch: true
 
 ## Git Fields
 
-The Git-related fields in `.gitrepoforge-config` control how `apply` and `bootstrap` interact with Git across the workspace. Their shape intentionally mirrors the repver Git config, but they are defined once in the root config and applied to each managed repository.
+The Git-related fields in `.gitrepoforge-config` control how `apply` interacts with Git across the workspace. Their shape intentionally mirrors the repver Git config, but they are defined once in the root config and applied to each managed repository.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|

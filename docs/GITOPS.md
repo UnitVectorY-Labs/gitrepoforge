@@ -7,9 +7,9 @@ permalink: /gitops
 
 # Git Operations
 
-gitrepoforge performs Git operations during `apply` and `bootstrap` when the root config enables them. All operations run inside each target repository using the local `git` CLI and, for pull requests, the GitHub CLI (`gh`). The behavior of each step is controlled by the Git fields in the root config (see [Root Config](/root-config)).
+gitrepoforge performs Git operations during `apply` when the root config enables them. All operations run inside each target repository using the local `git` CLI and, for pull requests, the GitHub CLI (`gh`). The behavior of each step is controlled by the Git fields in the root config (see [Root Config](/root-config)).
 
-If no Git automation is configured, `apply` and `bootstrap` still write the managed files; they simply stop before any Git commands.
+If no Git automation is configured, `apply` still writes the managed files; it simply stops before any Git commands.
 
 ## Branch Creation
 

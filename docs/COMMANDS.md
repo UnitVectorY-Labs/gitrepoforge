@@ -7,7 +7,7 @@ permalink: /commands
 
 # Commands
 
-gitrepoforge provides three commands: `validate`, `apply`, and `bootstrap`.
+gitrepoforge provides two commands: `validate` and `apply`.
 
 ## validate
 
@@ -89,25 +89,6 @@ gitrepoforge apply [flags]
 | `failed` | An error occurred during Git operations. |
 
 When `commit` is not enabled and a repo is `clean`, the same `compliant (not staged)` or `compliant (staged, not committed)` warnings described in the validate section apply here as well.
-
-## bootstrap
-
-Initializes a repo for the first time. It uses the same Git behavior as `apply`, but requires `--repo` so you target a single repository explicitly.
-
-```
-gitrepoforge bootstrap --repo <name> [flags]
-```
-
-### Flags
-
-| Flag | Required | Description |
-|------|----------|-------------|
-| `--repo <name>` | **yes** | Target repo (required for bootstrap). |
-| `--json` | no | Output results as JSON instead of human-readable text. |
-
-### Behavior
-
-Same as `apply`, but limited to the explicitly named repo.
 
 ## Output
 
