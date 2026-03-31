@@ -79,7 +79,7 @@ func parseTemplateDirectives(content string) (*ParsedTemplate, error) {
 			i = endIdx + 1
 
 		case "bootstrap":
-			content, endIdx, err := collectBlockContent(lines, i, "endbootstrap")
+			content, endIdx, err := collectBlockContent(lines, i)
 			if err != nil {
 				return nil, fmt.Errorf("bootstrap block: %w", err)
 			}
@@ -113,12 +113,18 @@ func hasStructuralDirectives(lines []string) bool {
 
 // extractDirectiveInner extracts the inner content of a {{ }} directive
 // line with optional trim markers stripped. Returns empty string if the
-// line is not a directive (does not start with {{ and end with }}).
+// line is not a single standalone directive (does not start with {{ and
+// end with }}, or contains embedded {{ / }} pairs).
 func extractDirectiveInner(trimmed string) string {
 	if !strings.HasPrefix(trimmed, "{{") || !strings.HasSuffix(trimmed, "}}") {
 		return ""
 	}
 	inner := trimmed[2 : len(trimmed)-2]
+	// If the inner text contains {{ or }}, this is not a standalone
+	// directive but rather multiple Go template actions on one line.
+	if strings.Contains(inner, "{{") || strings.Contains(inner, "}}") {
+		return ""
+	}
 	inner = strings.TrimSpace(inner)
 	if strings.HasPrefix(inner, "-") {
 		inner = strings.TrimSpace(inner[1:])
@@ -139,14 +145,14 @@ func directiveKeyword(inner string) string {
 }
 
 // parseSectionBlock parses a section directive and collects content until
-// {{ endsection }}.
+// {{ end }}.
 func parseSectionBlock(params string, lines []string, startLine int) (Section, int, error) {
 	start, end, err := parseSectionBoundaries(params)
 	if err != nil {
 		return Section{}, 0, fmt.Errorf("section directive: %w", err)
 	}
 
-	content, endIdx, err := collectBlockContent(lines, startLine, "endsection")
+	content, endIdx, err := collectBlockContent(lines, startLine)
 	if err != nil {
 		return Section{}, 0, fmt.Errorf("section block: %w", err)
 	}
@@ -319,25 +325,46 @@ func parseBoundary(spec string) (Boundary, error) {
 	return Boundary{}, fmt.Errorf("unknown boundary: %q", spec)
 }
 
+// isGoTemplateBlockOpener returns true if the keyword opens a Go
+// template block that requires a matching {{ end }}.
+func isGoTemplateBlockOpener(keyword string) bool {
+	switch keyword {
+	case "if", "range", "with", "block", "define":
+		return true
+	}
+	return false
+}
+
 // collectBlockContent reads lines from startLine+1 until a closing
-// directive with the given keyword is found. Returns the content between
-// the directives and the index of the closing directive line.
-func collectBlockContent(lines []string, startLine int, endKeyword string) (string, int, error) {
+// {{ end }} directive is found at nesting depth 0. Go template block
+// openers (if, range, with, block, define) and our own join blocks
+// increment the nesting depth so that their {{ end }} directives are
+// collected as content rather than treated as the block closer.
+func collectBlockContent(lines []string, startLine int) (string, int, error) {
 	var contentLines []string
+	depth := 0
 	i := startLine + 1
 	for i < len(lines) {
 		trimmed := strings.TrimSpace(lines[i])
 		inner := extractDirectiveInner(trimmed)
-		if inner != "" && directiveKeyword(inner) == endKeyword {
-			return strings.Join(contentLines, "\n"), i, nil
+		if inner != "" {
+			kw := directiveKeyword(inner)
+			if isGoTemplateBlockOpener(kw) || kw == "join" {
+				depth++
+			} else if kw == "end" {
+				if depth == 0 {
+					return strings.Join(contentLines, "\n"), i, nil
+				}
+				depth--
+			}
 		}
 		contentLines = append(contentLines, lines[i])
 		i++
 	}
-	return "", 0, fmt.Errorf("unterminated block starting at line %d: expected {{ %s }}", startLine+1, endKeyword)
+	return "", 0, fmt.Errorf("unterminated block starting at line %d: expected {{ end }}", startLine+1)
 }
 
-// processJoinBlocks finds {{ join }}...{{ endjoin }} blocks within content
+// processJoinBlocks finds {{ join }}...{{ end }} blocks within content
 // and replaces them with the content joined into a single line.
 func processJoinBlocks(content string) (string, error) {
 	lines := strings.Split(content, "\n")
@@ -363,12 +390,21 @@ func processJoinBlocks(content string) (string, error) {
 			i++
 			var joinedParts []string
 			found := false
+			depth := 0
 			for i < len(lines) {
 				trimmedInner := strings.TrimSpace(lines[i])
 				innerJoin := extractDirectiveInner(trimmedInner)
-				if innerJoin != "" && directiveKeyword(innerJoin) == "endjoin" {
-					found = true
-					break
+				if innerJoin != "" {
+					kw := directiveKeyword(innerJoin)
+					if isGoTemplateBlockOpener(kw) {
+						depth++
+					} else if kw == "end" {
+						if depth == 0 {
+							found = true
+							break
+						}
+						depth--
+					}
 				}
 				// Strip trailing \r left over from \r\n line endings
 				// since lines are already split on \n

@@ -46,11 +46,9 @@ Section directives let a template manage specific regions of a file instead of r
 | `{{ section start=<boundary> end=<boundary> }}` | Define a managed section with both boundaries. |
 | `{{ section start=<boundary> }}` | Define a managed section from a boundary to the end of the file. |
 | `{{ section end=<boundary> }}` | Define a managed section from the start of the file to a boundary. |
-| `{{ endsection }}` | End a section block. |
 | `{{ bootstrap }}` | Content only added when the file is first created. |
-| `{{ endbootstrap }}` | End a bootstrap block. |
 | `{{ join }}` | Join enclosed lines into a single line by removing newlines. |
-| `{{ endjoin }}` | End a join block. |
+| `{{ end }}` | End a section, bootstrap, or join block. |
 
 {% endraw %}
 
@@ -183,7 +181,7 @@ A section directive requires at least one boundary. When only `start=` is specif
 **Join blocks:** Lines inside a join block are concatenated with newlines removed, producing a single line. Join blocks can appear inside section blocks.
 
 {% raw %}
-The `{{ endsection }}` directive does not produce a trailing newline in the section content. This means the last line of a section block is included without an extra newline appended after it. For example, a section containing two lines produces content equivalent to `"line1\nline2"` rather than `"line1\nline2\n"`.
+The `{{ end }}` directive that closes a section does not produce a trailing newline in the section content. This means the last line of a section block is included without an extra newline appended after it. For example, a section containing two lines produces content equivalent to `"line1\nline2"` rather than `"line1\nline2\n"`.
 {% endraw %}
 
 ### Examples
@@ -195,7 +193,7 @@ Manage the header of a README while preserving user content below it:
 {{ section start=start_of_file end=contains("<!-- END MANAGED -->") }}
 # My Project
 <!-- END MANAGED -->
-{{ endsection }}
+{{ end }}
 ```
 {% endraw %}
 
@@ -204,7 +202,7 @@ Create a file only on first run (bootstrap), then leave it alone:
 {% raw %}
 ```text
 {{ bootstrap }}
-{{ endbootstrap }}
+{{ end }}
 ```
 {% endraw %}
 
@@ -216,9 +214,9 @@ Join badge images onto a single line:
 {{ join }}
 [![Build](https://img.shields.io/badge/build-passing-green)]
 [![Coverage](https://img.shields.io/badge/coverage-100%25-green)]
-{{ endjoin }}
+{{ end }}
 <!-- END BADGES -->
-{{ endsection }}
+{{ end }}
 ```
 {% endraw %}
 
@@ -229,11 +227,11 @@ Manage multiple sections (header and footer) while preserving everything in betw
 {{ section start=start_of_file end=content("<!-- END HEADER -->") }}
 # Managed Header
 <!-- END HEADER -->
-{{ endsection }}
+{{ end }}
 {{ section start=contains("<!-- START FOOTER -->") end=end_of_file }}
 <!-- START FOOTER -->
 Managed Footer Content
-{{ endsection }}
+{{ end }}
 ```
 {% endraw %}
 
@@ -244,7 +242,7 @@ Use `evaluate: true` with section directives for template rendering inside secti
 {{ section start=start_of_file end=contains("<!-- END MANAGED -->") }}
 # {{ .Name }}
 <!-- END MANAGED -->
-{{ endsection }}
+{{ end }}
 ```
 {% endraw %}
 
@@ -255,7 +253,7 @@ Manage only the footer of a file, preserving user content above:
 {{ section start=contains("<!-- START FOOTER -->") end=end_of_file }}
 <!-- START FOOTER -->
 Managed Footer
-{{ endsection }}
+{{ end }}
 ```
 {% endraw %}
 
@@ -267,7 +265,7 @@ Use `line(N)` to manage a fixed number of lines at the top of a file:
 Line 1 managed
 Line 2 managed
 Line 3 managed
-{{ endsection }}
+{{ end }}
 ```
 {% endraw %}
 
@@ -278,10 +276,10 @@ Combine a managed header section with bootstrap content that only appears when t
 {{ section start=start_of_file end=contains("<!-- END MANAGED -->") }}
 # Managed Header
 <!-- END MANAGED -->
-{{ endsection }}
+{{ end }}
 {{ bootstrap }}
 Default body content goes here.
-{{ endbootstrap }}
+{{ end }}
 ```
 {% endraw %}
 
@@ -294,7 +292,7 @@ Use only `start=` when the managed section should extend to the end of the file:
 {{ section start=contains("<!-- START FOOTER -->") }}
 <!-- START FOOTER -->
 Managed Footer
-{{ endsection }}
+{{ end }}
 ```
 
 Use only `end=` when the managed section should start at the beginning of the file:
@@ -303,7 +301,7 @@ Use only `end=` when the managed section should start at the beginning of the fi
 {{ section end=contains("<!-- END MANAGED -->") }}
 # Managed Header
 <!-- END MANAGED -->
-{{ endsection }}
+{{ end }}
 ```
 {% endraw %}
 

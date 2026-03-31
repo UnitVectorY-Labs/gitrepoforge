@@ -18,17 +18,17 @@ func TestProcessJoinBlocks(t *testing.T) {
 		},
 		{
 			name:  "simple join",
-			input: "{{ join }}\na\nb\nc\n{{ endjoin }}",
+			input: "{{ join }}\na\nb\nc\n{{ end }}",
 			want:  "abc",
 		},
 		{
 			name:  "join within other content",
-			input: "before\n{{ join }}\na\nb\n{{ endjoin }}\nafter",
+			input: "before\n{{ join }}\na\nb\n{{ end }}\nafter",
 			want:  "before\nab\nafter",
 		},
 		{
 			name:  "join with empty lines skipped",
-			input: "{{ join }}\na\n\nb\n{{ endjoin }}",
+			input: "{{ join }}\na\n\nb\n{{ end }}",
 			want:  "ab",
 		},
 		{
@@ -38,7 +38,7 @@ func TestProcessJoinBlocks(t *testing.T) {
 		},
 		{
 			name:  "join with trim markers",
-			input: "{{- join -}}\na\nb\n{{- endjoin -}}",
+			input: "{{- join -}}\na\nb\n{{- end -}}",
 			want:  "ab",
 		},
 	}
@@ -148,8 +148,8 @@ func TestExtractDirectiveInner(t *testing.T) {
 		},
 		{
 			name:  "with trailing trim",
-			input: `{{ endsection -}}`,
-			want:  "endsection",
+			input: `{{ end -}}`,
+			want:  "end",
 		},
 		{
 			name:  "with both trims",
@@ -167,9 +167,14 @@ func TestExtractDirectiveInner(t *testing.T) {
 			want:  ".Name",
 		},
 		{
-			name:  "endsection",
-			input: "{{ endsection }}",
-			want:  "endsection",
+			name:  "end directive",
+			input: "{{ end }}",
+			want:  "end",
+		},
+		{
+			name:  "multiple actions on one line rejected",
+			input: "{{ if .Cond }}{{ end }}",
+			want:  "",
 		},
 	}
 
@@ -202,7 +207,7 @@ func TestParseTemplateDirectives(t *testing.T) {
 			input: "{{ section start=start_of_file end=contains(\"<!-- END -->\") }}\n" +
 				"# Header\n" +
 				"<!-- END -->\n" +
-				"{{ endsection }}",
+				"{{ end }}",
 			wantSecs: 1,
 		},
 		{
@@ -210,10 +215,10 @@ func TestParseTemplateDirectives(t *testing.T) {
 			input: "{{ section start=start_of_file end=contains(\"<!-- END -->\") }}\n" +
 				"# Header\n" +
 				"<!-- END -->\n" +
-				"{{ endsection }}\n" +
+				"{{ end }}\n" +
 				"{{ bootstrap }}\n" +
 				"Default body\n" +
-				"{{ endbootstrap }}",
+				"{{ end }}",
 			wantSecs: 1,
 			wantBoot: true,
 		},
@@ -222,29 +227,29 @@ func TestParseTemplateDirectives(t *testing.T) {
 			input: "{{ section start=start_of_file end=content(\"<!-- DIVIDER -->\") }}\n" +
 				"Header\n" +
 				"<!-- DIVIDER -->\n" +
-				"{{ endsection }}\n" +
+				"{{ end }}\n" +
 				"{{ section start=contains(\"<!-- FOOTER -->\") end=end_of_file }}\n" +
 				"<!-- FOOTER -->\n" +
 				"Footer\n" +
-				"{{ endsection }}",
+				"{{ end }}",
 			wantSecs: 2,
 		},
 		{
 			name: "bootstrap only",
 			input: "{{ bootstrap }}\n" +
 				"some content\n" +
-				"{{ endbootstrap }}",
+				"{{ end }}",
 			wantBoot: true,
 		},
 		{
 			name:    "content outside sections is error",
-			input:   "some content\n{{ section start=start_of_file end=end_of_file }}\ncontent\n{{ endsection }}",
+			input:   "some content\n{{ section start=start_of_file end=end_of_file }}\ncontent\n{{ end }}",
 			wantErr: true,
 		},
 		{
 			name: "empty bootstrap",
 			input: "{{ bootstrap }}\n" +
-				"{{ endbootstrap }}",
+				"{{ end }}",
 			wantBoot: true,
 		},
 		{
@@ -256,14 +261,24 @@ func TestParseTemplateDirectives(t *testing.T) {
 			name: "section with only start boundary",
 			input: "{{ section start=start_of_file }}\n" +
 				"content\n" +
-				"{{ endsection }}",
+				"{{ end }}",
 			wantSecs: 1,
 		},
 		{
 			name: "section with only end boundary",
 			input: "{{ section end=end_of_file }}\n" +
 				"content\n" +
-				"{{ endsection }}",
+				"{{ end }}",
+			wantSecs: 1,
+		},
+		{
+			name: "section with go template if block inside",
+			input: "{{ section start=start_of_file end=end_of_file }}\n" +
+				"{{ if .Condition }}\n" +
+				"conditional\n" +
+				"{{ end }}\n" +
+				"always\n" +
+				"{{ end }}",
 			wantSecs: 1,
 		},
 	}

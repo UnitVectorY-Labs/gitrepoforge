@@ -282,7 +282,7 @@ templates:
 {{ section start=start_of_file end=contains("<!-- END MANAGED -->") }}
 # My Project
 <!-- END MANAGED -->
-{{ endsection }}
+{{ end }}
 ```
 {% endraw %}
 
@@ -301,7 +301,7 @@ templates:
 {% raw %}
 ```text
 {{ bootstrap }}
-{{ endbootstrap }}
+{{ end }}
 ```
 {% endraw %}
 
@@ -314,11 +314,11 @@ Manage both a header and footer while preserving user content in between:
 {{ section start=start_of_file end=content("<!-- END HEADER -->") }}
 # Managed Header
 <!-- END HEADER -->
-{{ endsection }}
+{{ end }}
 {{ section start=contains("<!-- START FOOTER -->") end=end_of_file }}
 <!-- START FOOTER -->
 Managed Footer Content
-{{ endsection }}
+{{ end }}
 ```
 {% endraw %}
 
@@ -331,10 +331,10 @@ Provide default body content on first creation, then manage only the header afte
 {{ section start=start_of_file end=contains("<!-- END MANAGED -->") }}
 # Managed Header
 <!-- END MANAGED -->
-{{ endsection }}
+{{ end }}
 {{ bootstrap }}
 Default body content goes here.
-{{ endbootstrap }}
+{{ end }}
 ```
 {% endraw %}
 
