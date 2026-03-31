@@ -396,7 +396,7 @@ func processJoinBlocks(content string) (string, error) {
 				innerJoin := extractDirectiveInner(trimmedInner)
 				if innerJoin != "" {
 					kw := directiveKeyword(innerJoin)
-					if isGoTemplateBlockOpener(kw) {
+					if isGoTemplateBlockOpener(kw) || kw == "join" {
 						depth++
 					} else if kw == "end" {
 						if depth == 0 {
