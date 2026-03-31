@@ -51,12 +51,11 @@ workspace/
 3. For each repo that has a `.gitrepoforge` file:
    - **Validate** repo metadata and config values against the shared schema.
    - **Compute findings** by selecting a matching template and comparing the rendered file to disk.
-4. **Report** findings (`validate`) or **apply** them, optionally followed by root-configured Git operations (`apply` / `bootstrap`).
+4. **Report** findings (`validate`) or **apply** them, optionally followed by root-configured Git operations (`apply`).
 
 ### Commands
 
 - **`validate`**: Dry-run audit. Reports drift without making changes.
 - **`apply`**: Applies the desired state and, when configured, runs shared Git automation.
-- **`bootstrap`**: Like apply, but targeted to a single repo for first-time setup.
 
 See [Commands](/commands) for full details.

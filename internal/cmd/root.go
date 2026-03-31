@@ -23,8 +23,6 @@ func Execute(version string) {
 		runValidate(version, os.Args[2:])
 	case "apply":
 		runApply(version, os.Args[2:])
-	case "bootstrap":
-		runBootstrap(version, os.Args[2:])
 	case "--help", "-h", "help":
 		printHelp()
 	default:
@@ -43,7 +41,6 @@ func printHelp() {
 	fmt.Printf("  %sCommands:%s\n", output.Bold, output.Reset)
 	fmt.Printf("    %svalidate%s      Audit repos against desired state (no changes)\n", output.Cyan, output.Reset)
 	fmt.Printf("    %sapply%s         Apply desired state changes to repos\n", output.Cyan, output.Reset)
-	fmt.Printf("    %sbootstrap%s     Bootstrap a new repo with desired state\n", output.Cyan, output.Reset)
 	fmt.Println()
 	fmt.Printf("  %sFlags:%s\n", output.Bold, output.Reset)
 	fmt.Printf("    %s--repo <name>%s   Target a single repo\n", output.Cyan, output.Reset)
