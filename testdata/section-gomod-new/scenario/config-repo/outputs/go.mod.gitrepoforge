@@ -1,0 +1,4 @@
+templates:
+  - condition: manage_gomod
+    template: go.mod.tmpl
+    evaluate: true
