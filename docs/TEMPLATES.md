@@ -24,6 +24,7 @@ All directives use the `{{ }}` delimiter syntax. The following table documents e
 | `{{ .Config.key }}` | Print a config value. Nested keys use dots, e.g. `{{ .Config.docs.domain }}`. |
 | `{{ value \| quote_double }}` | Pipe a value through the `quote_double` function. |
 | `{{ value \| quote_single }}` | Pipe a value through the `quote_single` function. |
+| `{{ capture "key" "group" }}` | Extract a named capture group from a config value with a `pattern`. |
 
 ### Control Flow Directives
 
@@ -59,6 +60,7 @@ Section directives let a template manage specific regions of a file instead of r
 | `getConfig` | Looks up a config value by key. |
 | `quote_double` | Returns a double-quoted string with escaping applied. |
 | `quote_single` | Returns a single-quoted string with escaping applied by doubling embedded single quotes. |
+| `capture` | Extracts a named capture group from a config value with a `pattern` defined. Takes a dotted key path and a group name. |
 
 Go template built-ins such as `if`, `eq`, `ne`, `and`, and `or` are also available.
 
@@ -151,6 +153,62 @@ Use `quote_double` or `quote_single` when a rendered value must become a quoted 
 description: {{ .Config.description | quote_double }}
 summary: {{ .Config.summary | quote_single }}
 go-version: {{ .Config.versions.go | quote_double }}
+```
+{% endraw %}
+
+## Capture Function
+
+The `capture` function extracts named capture groups from config values that have a `pattern` defined in their [config definition](/config-repo#pattern-matching). It takes a dotted key path and a group name:
+
+{% raw %}
+```text
+{{ capture "<key>" "<group>" }}
+```
+{% endraw %}
+
+Given a config definition:
+
+```yaml
+# config/versions/go.yaml
+type: string
+pattern: "^(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)$"
+```
+
+And a repo config value of `1.26.1`, the full value and individual groups can both be used:
+
+{% raw %}
+```yaml
+go-version: {{ .Config.versions.go | quote_single }}
+go: {{ capture "versions.go" "major" }}.{{ capture "versions.go" "minor" }}
+```
+{% endraw %}
+
+This renders as:
+
+```yaml
+go-version: '1.26.1'
+go: 1.26
+```
+
+The key path uses dots to reference nested config values, matching the same notation used in conditions. For a top-level config key named `version`, the key path is simply `"version"`. For a nested key like `versions.go`, it is `"versions.go"`.
+
+Template execution fails with an error if:
+
+- The key path does not reference a config value with a pattern.
+- The named group does not exist in the pattern.
+
+The `capture` function works in both whole-file templates and section-based templates when `evaluate: true` is set.
+
+{% raw %}
+Use `capture` in section directives to control specific parts of a file, such as the Go version line in `go.mod`:
+
+```text
+{{ section end=line(4) }}
+module github.com/my-org/{{ .Name }}
+
+go {{ capture "versions.go" "major" }}.{{ capture "versions.go" "minor" }}
+
+{{ end }}
 ```
 {% endraw %}
 

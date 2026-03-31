@@ -1,0 +1,6 @@
+{{ section end=line(4) }}
+module github.com/example/{{ .Name }}
+
+go {{ capture "versions.go" "major" }}.{{ capture "versions.go" "minor" }}
+
+{{ end }}

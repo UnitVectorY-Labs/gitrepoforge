@@ -1,0 +1,5 @@
+full: {{ .Config.versions.go }}
+major_minor: {{ capture "versions.go" "major" }}.{{ capture "versions.go" "minor" }}
+major: {{ capture "versions.go" "major" }}
+minor: {{ capture "versions.go" "minor" }}
+patch: {{ capture "versions.go" "patch" }}

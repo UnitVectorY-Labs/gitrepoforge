@@ -1,0 +1,5 @@
+full: 1.26.1
+major_minor: 1.26
+major: 1
+minor: 26
+patch: 1

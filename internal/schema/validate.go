@@ -130,6 +130,12 @@ func validateConfigValue(field string, val interface{}, def *config.ConfigDefini
 				})
 			}
 		}
+		if def.CompiledPattern != nil && !def.CompiledPattern.MatchString(strVal) {
+			errors = append(errors, ValidationError{
+				Field:   field,
+				Message: fmt.Sprintf("value %q does not match pattern %q", strVal, def.Pattern),
+			})
+		}
 	case "boolean":
 		if _, ok := val.(bool); !ok {
 			errors = append(errors, ValidationError{Field: field, Message: "expected boolean value"})

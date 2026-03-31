@@ -29,6 +29,7 @@ type TemplateData struct {
 	Name           string
 	DefaultBranch  string
 	Config         map[string]interface{}
+	captures       map[string]map[string]string
 	providedConfig map[string]interface{}
 }
 
@@ -44,6 +45,7 @@ func ComputeFindings(repoCfg *config.RepoConfig, centralCfg *config.CentralConfi
 		Name:           repoCfg.Name,
 		DefaultBranch:  repoCfg.DefaultBranch,
 		Config:         repoCfg.Config,
+		captures:       computeCaptures(repoCfg.Config, centralCfg.Definitions),
 		providedConfig: providedConfig,
 	}
 
@@ -283,6 +285,9 @@ func renderTemplateFile(path, templateMode string, data TemplateData) (string, e
 		"quote_single": func(value interface{}) string {
 			return quoteSingleTemplateValue(value)
 		},
+		"capture": func(key, group string) (string, error) {
+			return lookupCapture(data.captures, key, group)
+		},
 	}
 
 	tmpl, err := template.New(filepath.Base(path)).Funcs(funcMap).Parse(preparedContent)
@@ -320,6 +325,9 @@ func renderTemplateContent(path, content, templateMode string, data TemplateData
 		},
 		"quote_single": func(value interface{}) string {
 			return quoteSingleTemplateValue(value)
+		},
+		"capture": func(key, group string) (string, error) {
+			return lookupCapture(data.captures, key, group)
 		},
 	}
 
@@ -730,4 +738,58 @@ func cloneConfigValue(value interface{}) interface{} {
 	default:
 		return value
 	}
+}
+
+// computeCaptures extracts named capture groups from config values that have
+// patterns defined. The result maps dotted key paths to group-name/value pairs.
+func computeCaptures(values map[string]interface{}, definitions []config.ConfigDefinition) map[string]map[string]string {
+	captures := map[string]map[string]string{}
+	for _, def := range definitions {
+		if def.Type == "object" {
+			nested, ok := config.AsConfigMap(values[def.Name])
+			if !ok {
+				continue
+			}
+			for k, v := range computeCaptures(nested, def.Attributes) {
+				captures[def.Name+"."+k] = v
+			}
+			continue
+		}
+		if def.CompiledPattern == nil {
+			continue
+		}
+		val, ok := values[def.Name].(string)
+		if !ok {
+			continue
+		}
+		match := def.CompiledPattern.FindStringSubmatch(val)
+		if match == nil {
+			continue
+		}
+		groups := map[string]string{}
+		for i, name := range def.CompiledPattern.SubexpNames() {
+			if name != "" {
+				groups[name] = match[i]
+			}
+		}
+		captures[def.Name] = groups
+	}
+	return captures
+}
+
+// lookupCapture retrieves a named capture group value from the precomputed
+// captures map. Returns an error when no pattern or group is found.
+func lookupCapture(captures map[string]map[string]string, key, group string) (string, error) {
+	if captures == nil {
+		return "", fmt.Errorf("no pattern defined for config key %q", key)
+	}
+	keyCaptures, ok := captures[key]
+	if !ok {
+		return "", fmt.Errorf("no pattern defined for config key %q", key)
+	}
+	val, ok := keyCaptures[group]
+	if !ok {
+		return "", fmt.Errorf("no capture group %q defined in pattern for config key %q", group, key)
+	}
+	return val, nil
 }

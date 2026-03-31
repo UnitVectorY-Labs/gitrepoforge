@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -22,14 +23,17 @@ type CentralConfig struct {
 // ConfigDefinition defines a valid config value for per-repo configs.
 // Each definition is stored as its own file: config/<name>.yaml
 type ConfigDefinition struct {
-	Name        string             `yaml:"-"`
-	Type        string             `yaml:"type"`
-	Required    bool               `yaml:"required"`
-	Enum        []string           `yaml:"enum"`
-	Default     interface{}        `yaml:"default"`
-	HasDefault  bool               `yaml:"-"`
-	Description string             `yaml:"description"`
-	Attributes  []ConfigDefinition `yaml:"-"`
+	Name            string             `yaml:"-"`
+	Type            string             `yaml:"type"`
+	Required        bool               `yaml:"required"`
+	Enum            []string           `yaml:"enum"`
+	Default         interface{}        `yaml:"default"`
+	HasDefault      bool               `yaml:"-"`
+	Description     string             `yaml:"description"`
+	Pattern         string             `yaml:"pattern"`
+	CompiledPattern *regexp.Regexp     `yaml:"-"`
+	PatternGroups   []string           `yaml:"-"`
+	Attributes      []ConfigDefinition `yaml:"-"`
 }
 
 // FileRule defines how an output file is managed.
@@ -141,7 +145,7 @@ func loadConfigDefinitionsFromDir(configDir string, topLevel bool) ([]ConfigDefi
 		} else if hasAttributesDir {
 			return nil, fmt.Errorf("invalid config file %s: only object config definitions may define nested attributes in %s", path, attributesDir)
 		}
-		if err := validateDefinition(def, topLevel); err != nil {
+		if err := validateDefinition(&def, topLevel); err != nil {
 			return nil, fmt.Errorf("invalid config file %s: %w", path, err)
 		}
 		definitions = append(definitions, def)
@@ -309,7 +313,7 @@ func (d *ConfigDefinition) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-func validateDefinition(def ConfigDefinition, topLevel bool) error {
+func validateDefinition(def *ConfigDefinition, topLevel bool) error {
 	if topLevel {
 		if _, reserved := reservedConfigNames[def.Name]; reserved {
 			return fmt.Errorf("%q is reserved and cannot be used as a config key", def.Name)
@@ -330,11 +334,33 @@ func validateDefinition(def ConfigDefinition, topLevel bool) error {
 	if def.Type != "object" && len(def.Attributes) > 0 {
 		return fmt.Errorf("only object config definitions may define nested attributes")
 	}
+
+	if def.Pattern != "" {
+		if def.Type != "string" {
+			return fmt.Errorf("pattern is only supported for string config definitions")
+		}
+		re, err := regexp.Compile(def.Pattern)
+		if err != nil {
+			return fmt.Errorf("invalid pattern %q: %w", def.Pattern, err)
+		}
+		var groups []string
+		for _, name := range re.SubexpNames() {
+			if name != "" {
+				groups = append(groups, name)
+			}
+		}
+		if len(groups) == 0 {
+			return fmt.Errorf("pattern %q must contain at least one named capture group", def.Pattern)
+		}
+		def.CompiledPattern = re
+		def.PatternGroups = groups
+	}
+
 	if !def.HasDefault {
 		return nil
 	}
 
-	if err := validateDefaultValue(def); err != nil {
+	if err := validateDefaultValue(*def); err != nil {
 		return err
 	}
 
@@ -465,12 +491,19 @@ func validateDefaultValue(def ConfigDefinition) error {
 			return fmt.Errorf("default must be a string")
 		}
 		if len(def.Enum) > 0 {
+			found := false
 			for _, allowed := range def.Enum {
 				if allowed == value {
-					return nil
+					found = true
+					break
 				}
 			}
-			return fmt.Errorf("default %q is not one of: %s", value, strings.Join(def.Enum, ", "))
+			if !found {
+				return fmt.Errorf("default %q is not one of: %s", value, strings.Join(def.Enum, ", "))
+			}
+		}
+		if def.CompiledPattern != nil && !def.CompiledPattern.MatchString(value) {
+			return fmt.Errorf("default %q does not match pattern %q", value, def.Pattern)
 		}
 	case "boolean":
 		if _, ok := def.Default.(bool); !ok {

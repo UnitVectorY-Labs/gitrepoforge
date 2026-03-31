@@ -2,6 +2,8 @@ package schema
 
 import (
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/UnitVectorY-Labs/gitrepoforge/internal/config"
@@ -237,6 +239,57 @@ func TestValidateRepoConfigNestedObject(t *testing.T) {
 		}
 		if errs[0].Field != "config.docs" {
 			t.Fatalf("Field = %q, want %q", errs[0].Field, "config.docs")
+		}
+	})
+}
+
+func TestValidateRepoConfigPattern(t *testing.T) {
+	re := regexp.MustCompile(`^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)$`)
+	centralCfg := &config.CentralConfig{
+		Definitions: []config.ConfigDefinition{
+			{
+				Name:            "version",
+				Type:            "string",
+				Pattern:         `^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)$`,
+				CompiledPattern: re,
+				PatternGroups:   []string{"major", "minor", "patch"},
+			},
+		},
+	}
+
+	t.Run("value matches pattern", func(t *testing.T) {
+		repoCfg := &config.RepoConfig{
+			Name:          "example-repo",
+			DefaultBranch: "main",
+			Config: map[string]interface{}{
+				"version": "1.26.1",
+			},
+		}
+
+		errs := ValidateRepoConfig(repoCfg, centralCfg, filepath.Join(t.TempDir(), "example-repo"))
+		if len(errs) != 0 {
+			t.Fatalf("expected no validation errors, got %v", errs)
+		}
+	})
+
+	t.Run("value does not match pattern", func(t *testing.T) {
+		repoCfg := &config.RepoConfig{
+			Name:          "example-repo",
+			DefaultBranch: "main",
+			Config: map[string]interface{}{
+				"version": "not-a-version",
+			},
+		}
+
+		errs := ValidateRepoConfig(repoCfg, centralCfg, filepath.Join(t.TempDir(), "example-repo"))
+		if len(errs) != 1 {
+			t.Fatalf("expected 1 validation error, got %d: %v", len(errs), errs)
+		}
+		if errs[0].Field != "config.version" {
+			t.Fatalf("Field = %q, want %q", errs[0].Field, "config.version")
+		}
+		if !strings.Contains(errs[0].Message, "does not match pattern") {
+			t.Fatalf("Message = %q, want pattern match error", errs[0].Message)
 		}
 	})
 }
