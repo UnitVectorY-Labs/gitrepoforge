@@ -695,3 +695,108 @@ git:
 		t.Fatalf("unexpected error %q", err)
 	}
 }
+
+func TestLoadCentralConfigSupportsPattern(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "config/version.yaml", `type: string
+pattern: "^(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)$"
+`)
+	writeFile(t, dir, "outputs/version.txt.gitrepoforge", `templates:
+  - template: version.txt.tmpl
+`)
+	writeFile(t, dir, "templates/version.txt.tmpl", "placeholder\n")
+
+	cfg, err := LoadCentralConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadCentralConfig returned error: %v", err)
+	}
+
+	def := cfg.Definitions[0]
+	if def.Pattern == "" {
+		t.Fatal("Pattern is empty, expected a value")
+	}
+	if def.CompiledPattern == nil {
+		t.Fatal("CompiledPattern is nil")
+	}
+	if len(def.PatternGroups) != 3 {
+		t.Fatalf("PatternGroups = %v, want 3 groups", def.PatternGroups)
+	}
+}
+
+func TestLoadCentralConfigPatternWithDefault(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "config/version.yaml", `type: string
+default: "1.0.0"
+pattern: "^(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)$"
+`)
+
+	cfg, err := LoadCentralConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadCentralConfig returned error: %v", err)
+	}
+
+	if cfg.Definitions[0].Default != "1.0.0" {
+		t.Fatalf("Default = %v, want %q", cfg.Definitions[0].Default, "1.0.0")
+	}
+}
+
+func TestLoadCentralConfigRejectsPatternOnNonString(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "config/enabled.yaml", `type: boolean
+pattern: "^(?P<val>true|false)$"
+`)
+
+	_, err := LoadCentralConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "pattern is only supported for string") {
+		t.Fatalf("unexpected error %q", err)
+	}
+}
+
+func TestLoadCentralConfigRejectsPatternWithoutNamedGroups(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "config/version.yaml", `type: string
+pattern: "^\\d+\\.\\d+\\.\\d+$"
+`)
+
+	_, err := LoadCentralConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "must contain at least one named capture group") {
+		t.Fatalf("unexpected error %q", err)
+	}
+}
+
+func TestLoadCentralConfigRejectsInvalidPattern(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "config/version.yaml", `type: string
+pattern: "^(?P<major>\\d+"
+`)
+
+	_, err := LoadCentralConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid pattern") {
+		t.Fatalf("unexpected error %q", err)
+	}
+}
+
+func TestLoadCentralConfigRejectsDefaultNotMatchingPattern(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "config/version.yaml", `type: string
+default: "bad"
+pattern: "^(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)$"
+`)
+
+	_, err := LoadCentralConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "does not match pattern") {
+		t.Fatalf("unexpected error %q", err)
+	}
+}
