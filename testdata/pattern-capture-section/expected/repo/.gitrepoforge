@@ -1,0 +1,5 @@
+name: repo
+default_branch: main
+config:
+  versions:
+    go: "1.26.1"

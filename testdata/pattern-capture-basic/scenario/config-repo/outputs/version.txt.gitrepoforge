@@ -1,0 +1,3 @@
+templates:
+  - template: version.txt.tmpl
+    evaluate: true

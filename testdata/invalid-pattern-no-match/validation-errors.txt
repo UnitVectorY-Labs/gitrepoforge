@@ -1,0 +1,1 @@
+config.version: value "not-a-version" does not match pattern "^(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)$"

@@ -1,0 +1,1 @@
+pattern is only supported for string config definitions
