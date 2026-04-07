@@ -17,6 +17,8 @@ config_repo: config-repo
 ignore_missing: false
 excludes:
   - archived-*
+report:
+  collapse_diffs: true
 create_branch: true
 branch_name: "gitrepoforge/{{name}}"
 commit: true
@@ -84,3 +86,16 @@ These warnings help identify repos where the desired state has been applied but 
 ### Removed Fields
 
 The old Git fields and compatibility aliases are no longer supported. In particular, nested `git:` config, `branch_prefix`, `create_pr`, `bootstrap_commit_message`, `pr_title`, `pr_body`, `bootstrap_pr_title`, and `bootstrap_pr_body` are invalid.
+
+## Report Fields
+
+The optional `report` section controls the behavior of the `report` command.
+
+```yaml
+report:
+  collapse_diffs: true
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `collapse_diffs` | boolean | `true` | When `true`, diffs in the generated markdown report are wrapped in collapsible `<details>` blocks. Set to `false` to show diffs expanded by default. |
