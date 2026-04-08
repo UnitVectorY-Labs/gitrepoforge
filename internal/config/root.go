@@ -21,21 +21,32 @@ type GitConfig struct {
 	DeleteBranch           bool   `yaml:"delete_branch"`
 }
 
+// ReportConfig controls the behavior of the report command.
+type ReportConfig struct {
+	CollapseDiffs bool `yaml:"collapse_diffs"`
+}
+
 // RootConfig represents the root config dotfile (.gitrepoforge-config)
 // that lives in the checkout root (workspace directory).
 type RootConfig struct {
-	ConfigRepo    string    `yaml:"config_repo"`
-	Excludes      []string  `yaml:"excludes"`
-	IgnoreMissing bool      `yaml:"ignore_missing"`
-	Git           GitConfig `yaml:"-"`
+	ConfigRepo    string       `yaml:"config_repo"`
+	Excludes      []string     `yaml:"excludes"`
+	IgnoreMissing bool         `yaml:"ignore_missing"`
+	Git           GitConfig    `yaml:"-"`
+	Report        ReportConfig `yaml:"-"`
 }
 
 const RootConfigFileName = ".gitrepoforge-config"
 
+type rawReportConfig struct {
+	CollapseDiffs *bool `yaml:"collapse_diffs"`
+}
+
 type rawRootConfig struct {
-	ConfigRepo    string   `yaml:"config_repo"`
-	Excludes      []string `yaml:"excludes"`
-	IgnoreMissing bool     `yaml:"ignore_missing"`
+	ConfigRepo    string          `yaml:"config_repo"`
+	Excludes      []string        `yaml:"excludes"`
+	IgnoreMissing bool            `yaml:"ignore_missing"`
+	Report        rawReportConfig `yaml:"report"`
 	GitConfig     `yaml:",inline"`
 }
 
@@ -55,6 +66,12 @@ func LoadRootConfig(workspaceDir string) (*RootConfig, error) {
 		Excludes:      raw.Excludes,
 		IgnoreMissing: raw.IgnoreMissing,
 		Git:           raw.GitConfig,
+	}
+	cfg.Report = ReportConfig{
+		CollapseDiffs: true, // default
+	}
+	if raw.Report.CollapseDiffs != nil {
+		cfg.Report.CollapseDiffs = *raw.Report.CollapseDiffs
 	}
 	if cfg.ConfigRepo == "" {
 		return nil, fmt.Errorf("root config %s: config_repo is required", path)
