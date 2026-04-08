@@ -1,0 +1,21 @@
+$schema: http://json-schema.org/draft-07/schema#
+additionalProperties: false
+properties:
+    config:
+        additionalProperties: false
+        properties:
+            goversion:
+                default: 1.26.1
+                pattern: ^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)$
+                type: string
+        type: object
+    default_branch:
+        description: The default branch of the repository.
+        type: string
+    name:
+        description: Must match the repository folder name.
+        type: string
+required:
+    - default_branch
+    - name
+type: object

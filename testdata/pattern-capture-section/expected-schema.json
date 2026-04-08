@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "default_branch",
+    "name"
+  ],
+  "properties": {
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "versions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "go": {
+              "type": "string",
+              "pattern": "^(?P\u003cmajor\u003e\\d+)\\.(?P\u003cminor\u003e\\d+)\\.(?P\u003cpatch\u003e\\d+)$"
+            }
+          }
+        }
+      }
+    },
+    "default_branch": {
+      "type": "string",
+      "description": "The default branch of the repository."
+    },
+    "name": {
+      "type": "string",
+      "description": "Must match the repository folder name."
+    }
+  }
+}
