@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "config",
+    "default_branch",
+    "name"
+  ],
+  "properties": {
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "license"
+      ],
+      "properties": {
+        "enable_license": {
+          "type": "boolean",
+          "default": true
+        },
+        "license": {
+          "type": "string",
+          "enum": [
+            "mit",
+            "apache-2.0"
+          ],
+          "default": "mit"
+        }
+      }
+    },
+    "default_branch": {
+      "type": "string",
+      "description": "The default branch of the repository."
+    },
+    "name": {
+      "type": "string",
+      "description": "Must match the repository folder name."
+    }
+  }
+}

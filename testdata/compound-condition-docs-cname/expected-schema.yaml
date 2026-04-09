@@ -1,0 +1,27 @@
+$schema: http://json-schema.org/draft-07/schema#
+additionalProperties: false
+properties:
+    config:
+        additionalProperties: false
+        properties:
+            docs:
+                additionalProperties: false
+                properties:
+                    domain:
+                        default: docs.default.example.com
+                        type: string
+                    enabled:
+                        default: false
+                        type: boolean
+                type: object
+        type: object
+    default_branch:
+        description: The default branch of the repository.
+        type: string
+    name:
+        description: Must match the repository folder name.
+        type: string
+required:
+    - default_branch
+    - name
+type: object

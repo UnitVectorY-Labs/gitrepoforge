@@ -57,5 +57,7 @@ workspace/
 
 - **`validate`**: Dry-run audit. Reports drift without making changes.
 - **`apply`**: Applies the desired state and, when configured, runs shared Git automation.
+- **`report`**: Generates a markdown report of what `apply` would change, without making changes.
+- **`schema`**: Generates a JSON Schema for the `.gitrepoforge` per-repo config file.
 
 See [Commands](/commands) for full details.

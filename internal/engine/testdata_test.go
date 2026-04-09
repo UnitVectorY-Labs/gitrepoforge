@@ -77,6 +77,9 @@ func TestScenarioTestdata(t *testing.T) {
 			}
 
 			assertDirectoryMatches(t, filepath.Join(caseDir, "expected", "repo"), repoPath)
+
+			// Assert schema generation for valid test cases
+			assertSchemaMatches(t, caseDir, centralCfg)
 		})
 	}
 }
@@ -222,4 +225,52 @@ func nonEmptyLines(content string) []string {
 		lines = append(lines, line)
 	}
 	return lines
+}
+
+func assertSchemaMatches(t *testing.T, caseDir string, centralCfg *config.CentralConfig) {
+	t.Helper()
+
+	jsonSchema := schema.GenerateJSONSchema(centralCfg)
+
+	// Assert YAML schema
+	expectedYAML := readOptionalFile(t, filepath.Join(caseDir, "expected-schema.yaml"))
+	if expectedYAML != "" {
+		gotYAML, err := schema.RenderSchemaYAML(jsonSchema)
+		if err != nil {
+			t.Fatalf("RenderSchemaYAML error: %v", err)
+		}
+		if gotYAML != expectedYAML {
+			t.Fatalf("YAML schema mismatch:\ngot:\n%s\nwant:\n%s", gotYAML, expectedYAML)
+		}
+
+		// Verify determinism
+		gotYAML2, err := schema.RenderSchemaYAML(jsonSchema)
+		if err != nil {
+			t.Fatalf("RenderSchemaYAML error on second call: %v", err)
+		}
+		if gotYAML2 != gotYAML {
+			t.Fatal("YAML schema output is not deterministic")
+		}
+	}
+
+	// Assert JSON schema
+	expectedJSON := readOptionalFile(t, filepath.Join(caseDir, "expected-schema.json"))
+	if expectedJSON != "" {
+		gotJSON, err := schema.RenderSchemaJSON(jsonSchema)
+		if err != nil {
+			t.Fatalf("RenderSchemaJSON error: %v", err)
+		}
+		if gotJSON != expectedJSON {
+			t.Fatalf("JSON schema mismatch:\ngot:\n%s\nwant:\n%s", gotJSON, expectedJSON)
+		}
+
+		// Verify determinism
+		gotJSON2, err := schema.RenderSchemaJSON(jsonSchema)
+		if err != nil {
+			t.Fatalf("RenderSchemaJSON error on second call: %v", err)
+		}
+		if gotJSON2 != gotJSON {
+			t.Fatal("JSON schema output is not deterministic")
+		}
+	}
 }

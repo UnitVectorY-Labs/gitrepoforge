@@ -25,6 +25,8 @@ func Execute(version string) {
 		runApply(version, os.Args[2:])
 	case "report":
 		runReport(version, os.Args[2:])
+	case "schema":
+		runSchema(version, os.Args[2:])
 	case "--help", "-h", "help":
 		printHelp()
 	default:
@@ -44,11 +46,13 @@ func printHelp() {
 	fmt.Printf("    %svalidate%s      Audit repos against desired state (no changes)\n", output.Cyan, output.Reset)
 	fmt.Printf("    %sapply%s         Apply desired state changes to repos\n", output.Cyan, output.Reset)
 	fmt.Printf("    %sreport%s        Generate a markdown report of proposed changes\n", output.Cyan, output.Reset)
+	fmt.Printf("    %sschema%s        Generate a JSON Schema for the repo config\n", output.Cyan, output.Reset)
 	fmt.Println()
 	fmt.Printf("  %sFlags:%s\n", output.Bold, output.Reset)
-	fmt.Printf("    %s--repo <name>%s   Target a single repo\n", output.Cyan, output.Reset)
-	fmt.Printf("    %s--json%s          Output in JSON format\n", output.Cyan, output.Reset)
-	fmt.Printf("    %s--version, -v%s   Print version\n", output.Cyan, output.Reset)
-	fmt.Printf("    %s--help, -h%s      Show this help message\n", output.Cyan, output.Reset)
+	fmt.Printf("    %s--repo <name>%s     Target a single repo\n", output.Cyan, output.Reset)
+	fmt.Printf("    %s--json%s            Output in JSON format\n", output.Cyan, output.Reset)
+	fmt.Printf("    %s--output <path>%s   Write output to a file\n", output.Cyan, output.Reset)
+	fmt.Printf("    %s--version, -v%s     Print version\n", output.Cyan, output.Reset)
+	fmt.Printf("    %s--help, -h%s        Show this help message\n", output.Cyan, output.Reset)
 	fmt.Println()
 }
