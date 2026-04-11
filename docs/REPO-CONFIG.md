@@ -1,8 +1,9 @@
 ---
 layout: default
 title: Per-Repo Config
-nav_order: 4
-permalink: /repo-config
+parent: Configuration
+nav_order: 2
+permalink: /configuration/per-repo
 ---
 
 # Per-Repo Config

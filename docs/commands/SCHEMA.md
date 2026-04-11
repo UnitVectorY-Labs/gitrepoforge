@@ -1,6 +1,6 @@
 ---
 layout: default
-title: schema
+title: gitrepoforge schema
 parent: Commands
 nav_order: 4
 permalink: /commands/schema

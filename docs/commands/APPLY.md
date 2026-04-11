@@ -1,6 +1,6 @@
 ---
 layout: default
-title: apply
+title: gitrepoforge apply
 parent: Commands
 nav_order: 2
 permalink: /commands/apply
@@ -23,7 +23,7 @@ gitrepoforge apply [flags]
 
 ## Behavior
 
-1. Same discovery and validation as [`validate`](validate.md).
+1. Same discovery and validation as [`validate`](VALIDATE.md).
 2. For each repo with findings:
    - Applies file changes (`create`, `update`, `delete`).
    - If root Git automation is enabled, requires a clean working tree before running Git commands.
@@ -44,4 +44,4 @@ gitrepoforge apply [flags]
 | `applied` | Changes were written successfully, including any configured Git automation. |
 | `failed` | An error occurred during Git operations. |
 
-When `commit` is not enabled and a repo is `clean`, the same `compliant (not staged)` or `compliant (staged, not committed)` warnings described in the [validate](validate.md) section apply here as well.
+When `commit` is not enabled and a repo is `clean`, the same `compliant (not staged)` or `compliant (staged, not committed)` warnings described in the [validate](VALIDATE.md) section apply here as well.

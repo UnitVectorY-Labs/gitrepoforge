@@ -1,11 +1,12 @@
 ---
 layout: default
-title: Config Repo
-nav_order: 6
-permalink: /config-repo
+title: Config Repository
+parent: Configuration
+nav_order: 3
+permalink: /configuration/config-repo
 ---
 
-# Config Repo
+# Config Repository
 
 The config repo contains the shared definitions and file rules used across repositories.
 
@@ -125,7 +126,7 @@ With the value `1.26.1`, the named groups resolve to:
 | `minor` | `26` |
 | `patch` | `1` |
 
-Templates can then use `capture` to access individual groups. See [Template Files](/templates#capture-function) for usage details.
+Templates can then use `capture` to access individual groups. See [Template Files](/reference/templates#capture-function) for usage details.
 
 `pattern` and `enum` may be combined. The value must satisfy both constraints.
 
@@ -175,7 +176,7 @@ templates:
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `condition` | no | Boolean selector for the candidate. Empty means always matches, which is useful for a fallthrough entry. Supported forms are documented in [Condition Syntax](/conditions). |
+| `condition` | no | Boolean selector for the candidate. Empty means always matches, which is useful for a fallthrough entry. Supported forms are documented in [Condition Syntax](/reference/conditions). |
 | `template` | yes unless `absent` is true | Path to a file under `templates/`. |
 | `evaluate` | no | If true, render the template file with template data. If false or omitted, copy the file verbatim. |
 | `template_mode` | no | Controls how template delimiters are recognized when `evaluate` is true. `DOUBLE_BRACKET` is the default. `DOUBLE_BRACKET_STRICT` only recognizes {% raw %}`{{`{% endraw %} when it is at the start of the file or preceded by whitespace. |
@@ -297,7 +298,7 @@ Use parentheses when grouping is needed, for example `(docs.enabled || preview_d
 
 ### Section-Based Patterns
 
-Templates can use section directives to manage only part of a file instead of replacing the entire file. The directives are placed in the template file itself. See [Template Files](/templates#section-directives) for the full directive reference.
+Templates can use section directives to manage only part of a file instead of replacing the entire file. The directives are placed in the template file itself. See [Template Files](/reference/templates#section-directives) for the full directive reference.
 
 Manage a README header while letting users write the body:
 
@@ -374,4 +375,4 @@ Default body content goes here.
 
 ## `templates/`
 
-The `templates/` folder stores the file content referenced by output rules. See [Template Files](/templates) for rendering details.
+The `templates/` folder stores the file content referenced by output rules. See [Template Files](/reference/templates) for rendering details.

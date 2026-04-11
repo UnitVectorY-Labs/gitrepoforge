@@ -1,13 +1,14 @@
 ---
 layout: default
 title: Git Operations
-nav_order: 8
-permalink: /gitops
+parent: Reference
+nav_order: 3
+permalink: /reference/git-operations
 ---
 
 # Git Operations
 
-gitrepoforge performs Git operations during `apply` when the root config enables them. All operations run inside each target repository using the local `git` CLI and, for pull requests, the GitHub CLI (`gh`). The behavior of each step is controlled by the Git fields in the root config (see [Root Config](/root-config)).
+gitrepoforge performs Git operations during `apply` when the root config enables them. All operations run inside each target repository using the local `git` CLI and, for pull requests, the GitHub CLI (`gh`). The behavior of each step is controlled by the Git fields in the workspace config (see [Workspace Config](/configuration/workspace)).
 
 If no Git automation is configured, `apply` still writes the managed files; it simply stops before any Git commands.
 

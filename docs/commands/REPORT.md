@@ -1,6 +1,6 @@
 ---
 layout: default
-title: report
+title: gitrepoforge report
 parent: Commands
 nav_order: 3
 permalink: /commands/report
@@ -8,7 +8,7 @@ permalink: /commands/report
 
 # report
 
-Generates a markdown report showing what changes [`apply`](apply.md) would make, without actually making them. Changes are grouped by output file path and deduplicated so identical diffs across repos appear only once.
+Generates a markdown report showing what changes [`apply`](APPLY.md) would make, without actually making them. Changes are grouped by output file path and deduplicated so identical diffs across repos appear only once.
 
 ```
 gitrepoforge report [flags]
@@ -38,6 +38,6 @@ The generated markdown report contains:
 2. **File Summary** – a table listing each output file, its operation, and the number of affected repositories.
 3. **File Sections** – one section per output file path, showing the affected repositories and the deduplicated diffs.
 
-Diffs are rendered using the markdown diff code block syntax (` ```diff `). When `collapse_diffs` is `true` (the default), each diff is wrapped in a collapsible `<details>` block. See [Root Config](../ROOT-CONFIG.md) for how to configure this.
+Diffs are rendered using the markdown diff code block syntax (` ```diff `). When `collapse_diffs` is `true` (the default), each diff is wrapped in a collapsible `<details>` block. See [Workspace Config](/configuration/workspace) for how to configure this.
 
 When multiple repos have the same change to a file, the diffs are deduplicated based on the added and removed lines. Context lines that differ between repos (due to surrounding content) are ignored for deduplication purposes. If different repos have different changes to the same file, each unique change is shown separately with its own list of affected repositories.
