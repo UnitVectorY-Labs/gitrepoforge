@@ -1,8 +1,9 @@
 ---
 layout: default
 title: Template Files
-nav_order: 6
-permalink: /templates
+parent: Reference
+nav_order: 1
+permalink: /reference/templates
 ---
 
 # Template Files
@@ -158,7 +159,7 @@ go-version: {{ .Config.versions.go | quote_double }}
 
 ## Capture Function
 
-The `capture` function extracts named capture groups from config values that have a `pattern` defined in their [config definition](/config-repo#pattern-matching). It takes a dotted key path and a group name:
+The `capture` function extracts named capture groups from config values that have a `pattern` defined in their [config definition](/configuration/config-repo#pattern-matching). It takes a dotted key path and a group name:
 
 {% raw %}
 ```text

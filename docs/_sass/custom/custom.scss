@@ -1,0 +1,4 @@
+// Keep navigation expanded (not collapsed) for all parent sections
+.nav-list .nav-list-item > .nav-list-expander + .nav-list {
+  display: block !important;
+}

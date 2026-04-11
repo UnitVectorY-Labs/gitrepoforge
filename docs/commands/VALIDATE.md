@@ -1,6 +1,6 @@
 ---
 layout: default
-title: validate
+title: gitrepoforge validate
 parent: Commands
 nav_order: 1
 permalink: /commands/validate

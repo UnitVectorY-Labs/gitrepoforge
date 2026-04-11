@@ -1,8 +1,9 @@
 ---
 layout: default
 title: Condition Syntax
-nav_order: 7
-permalink: /conditions
+parent: Reference
+nav_order: 2
+permalink: /reference/conditions
 ---
 
 # Condition Syntax

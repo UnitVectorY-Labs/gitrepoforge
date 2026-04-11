@@ -8,14 +8,14 @@ has_children: true
 
 # Commands
 
-gitrepoforge provides four commands: [`validate`](commands/validate.md), [`apply`](commands/apply.md), [`report`](commands/report.md), and [`schema`](commands/schema.md).
+gitrepoforge provides four commands: [`validate`](commands/VALIDATE.md), [`apply`](commands/APPLY.md), [`report`](commands/REPORT.md), and [`schema`](commands/SCHEMA.md).
 
 | Command | Description |
 |---------|-------------|
-| [`validate`](commands/validate.md) | Dry-run audit. Reports drift without making changes. |
-| [`apply`](commands/apply.md) | Applies the desired state and optionally runs shared Git automation. |
-| [`report`](commands/report.md) | Generates a markdown report of what `apply` would change. |
-| [`schema`](commands/schema.md) | Generates a JSON Schema for the `.gitrepoforge` per-repo config file. |
+| [`validate`](commands/VALIDATE.md) | Dry-run audit. Reports drift without making changes. |
+| [`apply`](commands/APPLY.md) | Applies the desired state and optionally runs shared Git automation. |
+| [`report`](commands/REPORT.md) | Generates a markdown report of what `apply` would change. |
+| [`schema`](commands/SCHEMA.md) | Generates a JSON Schema for the `.gitrepoforge` per-repo config file. |
 
 ## Common Flags
 
