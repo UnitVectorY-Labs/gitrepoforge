@@ -13,6 +13,7 @@ type GitConfig struct {
 	BranchName             string `yaml:"branch_name"`
 	Commit                 bool   `yaml:"commit"`
 	CommitMessage          string `yaml:"commit_message"`
+	OnDefaultBranch        bool   `yaml:"on_default_branch"`
 	Push                   bool   `yaml:"push"`
 	Remote                 string `yaml:"remote"`
 	PullRequest            string `yaml:"pull_request"`

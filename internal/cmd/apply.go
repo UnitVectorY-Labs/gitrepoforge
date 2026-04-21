@@ -213,6 +213,23 @@ func applyFindingsWithGit(repoPath, repoName string, repoCfg *config.RepoConfig,
 			}
 			createdBranch = true
 		}
+	} else if gitCfg.OnDefaultBranch {
+		originalBranch, err = gitops.CurrentBranch(repoPath)
+		if err != nil {
+			return output.RepoResult{
+				Name:             repoName,
+				Status:           "failed",
+				ValidationErrors: []string{fmt.Sprintf("failed to determine current branch: %v", err)},
+			}
+		}
+	}
+
+	if gitCfg.OnDefaultBranch && originalBranch != repoCfg.DefaultBranch {
+		return output.RepoResult{
+			Name:             repoName,
+			Status:           "failed",
+			ValidationErrors: []string{fmt.Sprintf("repo is on branch %q; action requires default branch %q", originalBranch, repoCfg.DefaultBranch)},
+		}
 	}
 
 	if err := engine.ApplyFindings(findings, repoPath); err != nil {

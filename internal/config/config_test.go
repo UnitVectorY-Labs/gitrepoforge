@@ -406,6 +406,7 @@ action:
     branch_name: "ops/{{name}}"
     commit: true
     commit_message: "custom commit"
+    on_default_branch: true
     push: true
     remote: upstream
     pull_request: GITHUB_CLI
@@ -434,6 +435,9 @@ action:
 	if action.CommitMessage != "custom commit" {
 		t.Fatalf("CommitMessage = %q, want %q", action.CommitMessage, "custom commit")
 	}
+	if !action.OnDefaultBranch {
+		t.Fatalf("OnDefaultBranch = false, want true")
+	}
 	if !action.Push {
 		t.Fatalf("Push = false, want true")
 	}
@@ -453,15 +457,21 @@ action:
 
 func TestLoadRootConfigGitDefaults(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, dir, RootConfigFileName, "config_repo: config-repo\n")
+	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
+action:
+  stage: {}
+`)
 
 	cfg, err := LoadRootConfig(dir)
 	if err != nil {
 		t.Fatalf("LoadRootConfig returned error: %v", err)
 	}
 
-	if len(cfg.Actions) != 0 {
-		t.Fatalf("Actions = %v, want empty (no git automation)", cfg.Actions)
+	if len(cfg.Actions) != 1 {
+		t.Fatalf("Actions = %v, want one action", cfg.Actions)
+	}
+	if cfg.Actions["stage"].OnDefaultBranch {
+		t.Fatalf("OnDefaultBranch = true, want false by default")
 	}
 }
 

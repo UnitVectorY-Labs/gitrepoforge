@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -47,6 +48,26 @@ default_branch: main
 config: {}
 `)
 	return repoDir
+}
+
+func runApplyTestGit(t *testing.T, dir string, args ...string) {
+	t.Helper()
+
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, string(out))
+	}
+}
+
+func initApplyTestGitRepo(t *testing.T, repoDir string) {
+	t.Helper()
+
+	runApplyTestGit(t, repoDir, "init", "-b", "main")
+	runApplyTestGit(t, repoDir, "config", "user.name", "Test User")
+	runApplyTestGit(t, repoDir, "config", "user.email", "test@example.com")
+	runApplyTestGit(t, repoDir, "add", "-A")
+	runApplyTestGit(t, repoDir, "commit", "-m", "initial commit")
 }
 
 func TestResolveApplyActionDefaultsToDryRunWhenFlagOmitted(t *testing.T) {
@@ -117,5 +138,34 @@ func TestApplyRepoWithNamedActionAppliesChanges(t *testing.T) {
 	}
 	if string(content) != "managed readme\n" {
 		t.Fatalf("README.md = %q, want %q", string(content), "managed readme\n")
+	}
+}
+
+func TestApplyRepoWithOnDefaultBranchAppliesChangesOnDefaultBranch(t *testing.T) {
+	centralCfg := loadApplyTestCentralConfig(t)
+	repoDir := createApplyTestRepo(t)
+	initApplyTestGitRepo(t, repoDir)
+
+	result := applyRepo(repoDir, filepath.Base(repoDir), &config.GitConfig{OnDefaultBranch: true}, "stage", centralCfg)
+	if result.Status != "applied" {
+		t.Fatalf("Status = %q, want %q", result.Status, "applied")
+	}
+}
+
+func TestApplyRepoWithOnDefaultBranchFailsOffDefaultBranch(t *testing.T) {
+	centralCfg := loadApplyTestCentralConfig(t)
+	repoDir := createApplyTestRepo(t)
+	initApplyTestGitRepo(t, repoDir)
+	runApplyTestGit(t, repoDir, "checkout", "-b", "feature/test")
+
+	result := applyRepo(repoDir, filepath.Base(repoDir), &config.GitConfig{OnDefaultBranch: true}, "stage", centralCfg)
+	if result.Status != "failed" {
+		t.Fatalf("Status = %q, want %q", result.Status, "failed")
+	}
+	if len(result.ValidationErrors) != 1 {
+		t.Fatalf("ValidationErrors length = %d, want 1", len(result.ValidationErrors))
+	}
+	if !strings.Contains(result.ValidationErrors[0], `action requires default branch "main"`) {
+		t.Fatalf("unexpected validation error %q", result.ValidationErrors[0])
 	}
 }

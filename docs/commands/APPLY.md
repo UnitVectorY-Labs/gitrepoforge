@@ -28,13 +28,14 @@ gitrepoforge apply [flags]
 2. If `--action` is omitted:
    - Reports `drift` findings without writing files.
 3. If `--action` is provided:
-   - Resolves the named action from the `action` config in `.gitrepoforge-config`.
-   - For each repo with findings, applies file changes (`create`, `update`, `delete`).
-   - If Git automation is enabled for the selected action, requires a clean working tree before running Git commands.
-   - If `create_branch` is `true`, creates the configured branch from the repo's current branch.
-   - If `commit` is `true`, stages and commits the changes.
-   - If `push` is `true`, pushes the active branch to `remote`.
-   - If `pull_request` is `GITHUB_CLI`, opens a PR via `gh pr create --fill`.
+    - Resolves the named action from the `action` config in `.gitrepoforge-config`.
+    - For each repo with findings, applies file changes (`create`, `update`, `delete`).
+    - If Git automation is enabled for the selected action, requires a clean working tree before running Git commands.
+    - If `on_default_branch` is `true`, fails the action unless the repo is currently on the branch named by that repo's `.gitrepoforge` `default_branch`.
+    - If `create_branch` is `true`, creates the configured branch from the repo's current branch.
+    - If `commit` is `true`, stages and commits the changes.
+    - If `push` is `true`, pushes the active branch to `remote`.
+    - If `pull_request` is `GITHUB_CLI`, opens a PR via `gh pr create --fill`.
    - If `return_to_original_branch` is `true`, switches back to the original branch.
    - If `delete_branch` is `true`, deletes the created branch after returning.
 
