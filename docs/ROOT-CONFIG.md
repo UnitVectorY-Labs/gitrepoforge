@@ -20,7 +20,7 @@ excludes:
   - archived-*
 report:
   collapse_diffs: true
-apply:
+action:
   stage: {}
   commit:
     commit: true
@@ -48,12 +48,12 @@ apply:
 | `excludes` | no | Repo folder globs to skip during discovery. |
 | `ignore_missing` | no | When `true`, suppresses the warning for repos that have no `.gitrepoforge` file. Defaults to `false`. |
 
-## Apply Actions
+## Actions
 
-The optional `apply` section defines named **actions** that control how `apply` interacts with Git. Each key under `apply` is an action name; its value is a set of Git fields for that action.
+The optional `action` section defines named **actions** that control how `apply` interacts with Git. Each key under `action` is an action name; its value is a set of Git fields for that action.
 
 ```yaml
-apply:
+action:
   <action-name>:
     <git-fields>
 ```
@@ -64,7 +64,7 @@ Pass the action name at the command line with `--action`:
 gitrepoforge apply --action pr
 ```
 
-If `--action` is omitted, no Git automation runs (files are still written).
+If `--action` is omitted, `apply` behaves like `validate`: it reports drift but does not write files. To make changes, pass a named action from the `action` object.
 
 Multiple actions may be defined to support different workflows — for example a `stage` action that only writes files, a `commit` action that commits directly, and a `pr` action that branches and opens a pull request.
 

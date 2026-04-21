@@ -397,10 +397,10 @@ func TestLoadCentralConfigRejectsInvalidTemplateMode(t *testing.T) {
 	}
 }
 
-func TestLoadRootConfigGitSection(t *testing.T) {
+func TestLoadRootConfigActionSection(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-apply:
+action:
   pr:
     create_branch: true
     branch_name: "ops/{{name}}"
@@ -504,7 +504,7 @@ bootstrap_commit_message: "legacy"
 func TestLoadRootConfigRejectsInvalidPullRequest(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-apply:
+action:
   myaction:
     push: false
     pull_request: INVALID
@@ -522,7 +522,7 @@ apply:
 func TestLoadRootConfigRejectsPRWithoutPush(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-apply:
+action:
   myaction:
     push: false
     pull_request: GITHUB_CLI
@@ -540,7 +540,7 @@ apply:
 func TestLoadRootConfigRejectsDeleteBranchWithoutReturn(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-apply:
+action:
   myaction:
     return_to_original_branch: false
     delete_branch: true
@@ -558,7 +558,7 @@ apply:
 func TestLoadRootConfigRejectsReturnWithoutCreateBranch(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-apply:
+action:
   myaction:
     return_to_original_branch: true
 `)
@@ -575,7 +575,7 @@ apply:
 func TestLoadRootConfigPushFalse(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-apply:
+action:
   myaction:
     push: false
 `)
@@ -594,7 +594,7 @@ apply:
 func TestLoadRootConfigPullRequestCaseInsensitive(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-apply:
+action:
   myaction:
     push: true
     remote: origin
@@ -615,7 +615,7 @@ apply:
 func TestLoadRootConfigMultipleActions(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-apply:
+action:
   stage: {}
   commit:
     commit: true
@@ -672,7 +672,7 @@ func TestResolveActionEmpty(t *testing.T) {
 func TestResolveActionNamed(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-apply:
+action:
   commit:
     commit: true
     commit_message: "gitrepoforge: apply {{name}}"
@@ -695,7 +695,7 @@ apply:
 func TestResolveActionUnknown(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-apply:
+action:
   commit:
     commit: true
     commit_message: "gitrepoforge: apply {{name}}"

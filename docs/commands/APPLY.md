@@ -8,7 +8,7 @@ permalink: /commands/apply
 
 # apply
 
-Applies the desired state to repos by writing files and then optionally running Git automation from `.gitrepoforge-config`.
+Applies the desired state to repos when a named `--action` is selected. Without `--action`, `apply` behaves like `validate` and reports drift without writing files.
 
 ```
 gitrepoforge apply [flags]
@@ -20,14 +20,16 @@ gitrepoforge apply [flags]
 |------|----------|-------------|
 | `--repo <name>` | no | Target a single repo by its directory name. |
 | `--json` | no | Output results as JSON instead of human-readable text. |
-| `--action <name>` | no | Named action from the `apply` config to use for Git automation. |
+| `--action <name>` | no | Named action from the `action` config to use for Git automation. |
 
 ## Behavior
 
 1. Same discovery and validation as [`validate`](VALIDATE.md).
-2. For each repo with findings:
-   - Applies file changes (`create`, `update`, `delete`).
-   - If `--action` is provided, resolves the named action from the `apply` config in `.gitrepoforge-config`.
+2. If `--action` is omitted:
+   - Reports `drift` findings without writing files.
+3. If `--action` is provided:
+   - Resolves the named action from the `action` config in `.gitrepoforge-config`.
+   - For each repo with findings, applies file changes (`create`, `update`, `delete`).
    - If Git automation is enabled for the selected action, requires a clean working tree before running Git commands.
    - If `create_branch` is `true`, creates the configured branch from the repo's current branch.
    - If `commit` is `true`, stages and commits the changes.
@@ -36,7 +38,7 @@ gitrepoforge apply [flags]
    - If `return_to_original_branch` is `true`, switches back to the original branch.
    - If `delete_branch` is `true`, deletes the created branch after returning.
 
-If `--action` is omitted, files are still written but no Git commands are run.
+`--action` must match a key under the root config's `action` object.
 
 ## Statuses
 
@@ -45,6 +47,7 @@ If `--action` is omitted, files are still written but no Git commands are run.
 | `clean` | Already compliant and nothing needs to change. |
 | `skipped` | No `.gitrepoforge` file was found. |
 | `invalid` | Validation errors prevented apply. |
+| `drift` | `--action` was omitted and the repo differs from the desired state. |
 | `applied` | Changes were written successfully, including any configured Git automation. |
 | `failed` | An error occurred during Git operations. |
 

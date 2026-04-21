@@ -46,7 +46,7 @@ type rawRootConfig struct {
 	Excludes      []string             `yaml:"excludes"`
 	IgnoreMissing bool                 `yaml:"ignore_missing"`
 	Report        rawReportConfig      `yaml:"report"`
-	Apply         map[string]GitConfig `yaml:"apply"`
+	Action        map[string]GitConfig `yaml:"action"`
 }
 
 func LoadRootConfig(workspaceDir string) (*RootConfig, error) {
@@ -74,10 +74,10 @@ func LoadRootConfig(workspaceDir string) (*RootConfig, error) {
 	if cfg.ConfigRepo == "" {
 		return nil, fmt.Errorf("root config %s: config_repo is required", path)
 	}
-	actions := make(map[string]GitConfig, len(raw.Apply))
-	for name, gitCfg := range raw.Apply {
+	actions := make(map[string]GitConfig, len(raw.Action))
+	for name, gitCfg := range raw.Action {
 		if err := validateGitConfig(&gitCfg); err != nil {
-			return nil, fmt.Errorf("root config %s: apply.%s: %w", path, name, err)
+			return nil, fmt.Errorf("root config %s: action.%s: %w", path, name, err)
 		}
 		actions[name] = gitCfg
 	}
@@ -95,7 +95,7 @@ func (rc *RootConfig) ResolveAction(name string) (*GitConfig, error) {
 	}
 	action, ok := rc.Actions[name]
 	if !ok {
-		return nil, fmt.Errorf("action %q is not defined in the apply config", name)
+		return nil, fmt.Errorf("action %q is not defined in the action config", name)
 	}
 	return &action, nil
 }
