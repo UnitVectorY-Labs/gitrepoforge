@@ -13,7 +13,7 @@ gitrepoforge provides four commands: [`validate`](commands/VALIDATE.md), [`apply
 | Command | Description |
 |---------|-------------|
 | [`validate`](commands/VALIDATE.md) | Dry-run audit. Reports drift without making changes. |
-| [`apply`](commands/APPLY.md) | Applies the desired state and optionally runs shared Git automation. |
+| [`apply`](commands/APPLY.md) | Reports drift by default, or applies the desired state when `--action` selects a named action. |
 | [`report`](commands/REPORT.md) | Generates a markdown report of what `apply` would change. |
 | [`schema`](commands/SCHEMA.md) | Generates a JSON Schema for the `.gitrepoforge` per-repo config file. |
 
@@ -26,6 +26,7 @@ Several flags are shared across commands:
 | `--repo <name>` | `validate`, `apply`, `report` | Target a single repo by its directory name. |
 | `--json` | `validate`, `apply`, `schema` | Output results as JSON instead of the default format. |
 | `--output <path>` | `report`, `schema` | Write output to a file instead of stdout. |
+| `--action <name>` | `apply` | Named action from the `action` config to use for Git automation. |
 
 ## Output
 

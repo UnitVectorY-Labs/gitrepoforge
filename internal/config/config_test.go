@@ -31,8 +31,8 @@ func TestLoadRootConfig(t *testing.T) {
 	if cfg.ConfigRepo != "config-repo" {
 		t.Fatalf("ConfigRepo = %q, want %q", cfg.ConfigRepo, "config-repo")
 	}
-	if cfg.Git.PullRequest != PullRequestNo {
-		t.Fatalf("Git.PullRequest = %q, want default %q", cfg.Git.PullRequest, PullRequestNo)
+	if len(cfg.Actions) != 0 {
+		t.Fatalf("Actions = %v, want empty", cfg.Actions)
 	}
 }
 
@@ -397,18 +397,20 @@ func TestLoadCentralConfigRejectsInvalidTemplateMode(t *testing.T) {
 	}
 }
 
-func TestLoadRootConfigGitSection(t *testing.T) {
+func TestLoadRootConfigActionSection(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-create_branch: true
-branch_name: "ops/{{name}}"
-commit: true
-commit_message: "custom commit"
-push: true
-remote: upstream
-pull_request: GITHUB_CLI
-return_to_original_branch: true
-delete_branch: true
+action:
+  pr:
+    create_branch: true
+    branch_name: "ops/{{name}}"
+    commit: true
+    commit_message: "custom commit"
+    push: true
+    remote: upstream
+    pull_request: GITHUB_CLI
+    return_to_original_branch: true
+    delete_branch: true
 `)
 
 	cfg, err := LoadRootConfig(dir)
@@ -416,32 +418,36 @@ delete_branch: true
 		t.Fatalf("LoadRootConfig returned error: %v", err)
 	}
 
-	if !cfg.Git.CreateBranch {
-		t.Fatalf("Git.CreateBranch = false, want true")
+	action, ok := cfg.Actions["pr"]
+	if !ok {
+		t.Fatalf("Actions[pr] not found")
 	}
-	if cfg.Git.BranchName != "ops/{{name}}" {
-		t.Fatalf("Git.BranchName = %q, want %q", cfg.Git.BranchName, "ops/{{name}}")
+	if !action.CreateBranch {
+		t.Fatalf("CreateBranch = false, want true")
 	}
-	if !cfg.Git.Commit {
-		t.Fatalf("Git.Commit = false, want true")
+	if action.BranchName != "ops/{{name}}" {
+		t.Fatalf("BranchName = %q, want %q", action.BranchName, "ops/{{name}}")
 	}
-	if cfg.Git.CommitMessage != "custom commit" {
-		t.Fatalf("Git.CommitMessage = %q, want %q", cfg.Git.CommitMessage, "custom commit")
+	if !action.Commit {
+		t.Fatalf("Commit = false, want true")
 	}
-	if !cfg.Git.Push {
-		t.Fatalf("Git.Push = false, want true")
+	if action.CommitMessage != "custom commit" {
+		t.Fatalf("CommitMessage = %q, want %q", action.CommitMessage, "custom commit")
 	}
-	if cfg.Git.Remote != "upstream" {
-		t.Fatalf("Git.Remote = %q, want %q", cfg.Git.Remote, "upstream")
+	if !action.Push {
+		t.Fatalf("Push = false, want true")
 	}
-	if cfg.Git.PullRequest != PullRequestGitHubCLI {
-		t.Fatalf("Git.PullRequest = %q, want %q", cfg.Git.PullRequest, PullRequestGitHubCLI)
+	if action.Remote != "upstream" {
+		t.Fatalf("Remote = %q, want %q", action.Remote, "upstream")
 	}
-	if !cfg.Git.ReturnToOriginalBranch {
-		t.Fatalf("Git.ReturnToOriginalBranch = false, want true")
+	if action.PullRequest != PullRequestGitHubCLI {
+		t.Fatalf("PullRequest = %q, want %q", action.PullRequest, PullRequestGitHubCLI)
 	}
-	if !cfg.Git.DeleteBranch {
-		t.Fatalf("Git.DeleteBranch = false, want true")
+	if !action.ReturnToOriginalBranch {
+		t.Fatalf("ReturnToOriginalBranch = false, want true")
+	}
+	if !action.DeleteBranch {
+		t.Fatalf("DeleteBranch = false, want true")
 	}
 }
 
@@ -454,23 +460,8 @@ func TestLoadRootConfigGitDefaults(t *testing.T) {
 		t.Fatalf("LoadRootConfig returned error: %v", err)
 	}
 
-	if cfg.Git.CreateBranch {
-		t.Fatalf("Git.CreateBranch = true, want false")
-	}
-	if cfg.Git.Commit {
-		t.Fatalf("Git.Commit = true, want false")
-	}
-	if cfg.Git.Push {
-		t.Fatalf("Git.Push = true, want false")
-	}
-	if cfg.Git.PullRequest != PullRequestNo {
-		t.Fatalf("Git.PullRequest = %q, want %q", cfg.Git.PullRequest, PullRequestNo)
-	}
-	if cfg.Git.ReturnToOriginalBranch {
-		t.Fatalf("Git.ReturnToOriginalBranch = true, want false")
-	}
-	if cfg.Git.DeleteBranch {
-		t.Fatalf("Git.DeleteBranch = true, want false (default)")
+	if len(cfg.Actions) != 0 {
+		t.Fatalf("Actions = %v, want empty (no git automation)", cfg.Actions)
 	}
 }
 
@@ -513,7 +504,10 @@ bootstrap_commit_message: "legacy"
 func TestLoadRootConfigRejectsInvalidPullRequest(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-pull_request: INVALID
+action:
+  myaction:
+    push: false
+    pull_request: INVALID
 `)
 
 	_, err := LoadRootConfig(dir)
@@ -528,8 +522,10 @@ pull_request: INVALID
 func TestLoadRootConfigRejectsPRWithoutPush(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-push: false
-pull_request: GITHUB_CLI
+action:
+  myaction:
+    push: false
+    pull_request: GITHUB_CLI
 `)
 
 	_, err := LoadRootConfig(dir)
@@ -544,8 +540,10 @@ pull_request: GITHUB_CLI
 func TestLoadRootConfigRejectsDeleteBranchWithoutReturn(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-return_to_original_branch: false
-delete_branch: true
+action:
+  myaction:
+    return_to_original_branch: false
+    delete_branch: true
 `)
 
 	_, err := LoadRootConfig(dir)
@@ -560,7 +558,9 @@ delete_branch: true
 func TestLoadRootConfigRejectsReturnWithoutCreateBranch(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-return_to_original_branch: true
+action:
+  myaction:
+    return_to_original_branch: true
 `)
 
 	_, err := LoadRootConfig(dir)
@@ -575,7 +575,9 @@ return_to_original_branch: true
 func TestLoadRootConfigPushFalse(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-push: false
+action:
+  myaction:
+    push: false
 `)
 
 	cfg, err := LoadRootConfig(dir)
@@ -583,17 +585,20 @@ push: false
 		t.Fatalf("LoadRootConfig returned error: %v", err)
 	}
 
-	if cfg.Git.Push {
-		t.Fatalf("Git.Push = true, want false")
+	action := cfg.Actions["myaction"]
+	if action.Push {
+		t.Fatalf("Push = true, want false")
 	}
 }
 
 func TestLoadRootConfigPullRequestCaseInsensitive(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
-push: true
-remote: origin
-pull_request: github_cli
+action:
+  myaction:
+    push: true
+    remote: origin
+    pull_request: github_cli
 `)
 
 	cfg, err := LoadRootConfig(dir)
@@ -601,8 +606,112 @@ pull_request: github_cli
 		t.Fatalf("LoadRootConfig returned error: %v", err)
 	}
 
-	if cfg.Git.PullRequest != PullRequestGitHubCLI {
-		t.Fatalf("Git.PullRequest = %q, want %q (normalized to upper case)", cfg.Git.PullRequest, PullRequestGitHubCLI)
+	action := cfg.Actions["myaction"]
+	if action.PullRequest != PullRequestGitHubCLI {
+		t.Fatalf("PullRequest = %q, want %q (normalized to upper case)", action.PullRequest, PullRequestGitHubCLI)
+	}
+}
+
+func TestLoadRootConfigMultipleActions(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
+action:
+  stage: {}
+  commit:
+    commit: true
+    commit_message: "gitrepoforge: apply {{name}}"
+  pr:
+    create_branch: true
+    branch_name: "gitrepoforge/{{name}}"
+    commit: true
+    commit_message: "gitrepoforge: apply {{name}}"
+    push: true
+    remote: origin
+    pull_request: GITHUB_CLI
+    return_to_original_branch: true
+    delete_branch: true
+`)
+
+	cfg, err := LoadRootConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadRootConfig returned error: %v", err)
+	}
+
+	if len(cfg.Actions) != 3 {
+		t.Fatalf("Actions length = %d, want 3", len(cfg.Actions))
+	}
+	if _, ok := cfg.Actions["stage"]; !ok {
+		t.Fatalf("Actions[stage] not found")
+	}
+	if _, ok := cfg.Actions["commit"]; !ok {
+		t.Fatalf("Actions[commit] not found")
+	}
+	if _, ok := cfg.Actions["pr"]; !ok {
+		t.Fatalf("Actions[pr] not found")
+	}
+}
+
+func TestResolveActionEmpty(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, "config_repo: config-repo\n")
+
+	cfg, err := LoadRootConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadRootConfig returned error: %v", err)
+	}
+
+	gitCfg, err := cfg.ResolveAction("")
+	if err != nil {
+		t.Fatalf("ResolveAction returned error: %v", err)
+	}
+	if gitCfg.GitOptionsSpecified() {
+		t.Fatalf("expected no git automation for empty action name")
+	}
+}
+
+func TestResolveActionNamed(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
+action:
+  commit:
+    commit: true
+    commit_message: "gitrepoforge: apply {{name}}"
+`)
+
+	cfg, err := LoadRootConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadRootConfig returned error: %v", err)
+	}
+
+	gitCfg, err := cfg.ResolveAction("commit")
+	if err != nil {
+		t.Fatalf("ResolveAction returned error: %v", err)
+	}
+	if !gitCfg.Commit {
+		t.Fatalf("Commit = false, want true")
+	}
+}
+
+func TestResolveActionUnknown(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, `config_repo: config-repo
+action:
+  commit:
+    commit: true
+    commit_message: "gitrepoforge: apply {{name}}"
+`)
+
+	cfg, err := LoadRootConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadRootConfig returned error: %v", err)
+	}
+
+	_, err = cfg.ResolveAction("nonexistent")
+	if err == nil {
+		t.Fatal("expected error for unknown action, got nil")
+	}
+	if !strings.Contains(err.Error(), "nonexistent") {
+		t.Fatalf("error %q does not mention the action name", err)
 	}
 }
 

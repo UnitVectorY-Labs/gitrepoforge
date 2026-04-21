@@ -112,9 +112,7 @@ func runValidate(version string, args []string) {
 			result := output.RepoResult{
 				Name:   repoName,
 				Status: "clean",
-			}
-			if !rootCfg.Git.Commit {
-				result.StatusDetail = cleanStatusDetail(repoPath)
+				StatusDetail: cleanStatusDetail(repoPath),
 			}
 			report.Repos = append(report.Repos, result)
 		} else {
