@@ -302,6 +302,9 @@ func applyFindingsWithGit(repoPath, repoName string, repoCfg *config.RepoConfig,
 }
 
 func validateRootGitTemplates(gitCfg *config.GitConfig, actionName string, repoCfg *config.RepoConfig) []string {
+	if actionName == "" {
+		return nil
+	}
 	var errors []string
 	values := repoCfg.PlaceholderValues()
 	prefix := "apply." + actionName

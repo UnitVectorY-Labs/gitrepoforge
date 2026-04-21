@@ -64,7 +64,6 @@ func LoadRootConfig(workspaceDir string) (*RootConfig, error) {
 		ConfigRepo:    raw.ConfigRepo,
 		Excludes:      raw.Excludes,
 		IgnoreMissing: raw.IgnoreMissing,
-		Actions:       map[string]GitConfig{},
 	}
 	cfg.Report = ReportConfig{
 		CollapseDiffs: true, // default
@@ -75,12 +74,14 @@ func LoadRootConfig(workspaceDir string) (*RootConfig, error) {
 	if cfg.ConfigRepo == "" {
 		return nil, fmt.Errorf("root config %s: config_repo is required", path)
 	}
+	actions := make(map[string]GitConfig, len(raw.Apply))
 	for name, gitCfg := range raw.Apply {
 		if err := validateGitConfig(&gitCfg); err != nil {
 			return nil, fmt.Errorf("root config %s: apply.%s: %w", path, name, err)
 		}
-		cfg.Actions[name] = gitCfg
+		actions[name] = gitCfg
 	}
+	cfg.Actions = actions
 
 	return &cfg, nil
 }
