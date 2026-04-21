@@ -7,8 +7,7 @@ import (
 	"strings"
 )
 
-// GitConfig controls the Git automation performed during apply.
-// It mirrors the git configuration section from the repver tool.
+// GitConfig controls the Git automation performed during apply for a named action.
 type GitConfig struct {
 	CreateBranch           bool   `yaml:"create_branch"`
 	BranchName             string `yaml:"branch_name"`
@@ -29,11 +28,11 @@ type ReportConfig struct {
 // RootConfig represents the root config dotfile (.gitrepoforge-config)
 // that lives in the checkout root (workspace directory).
 type RootConfig struct {
-	ConfigRepo    string       `yaml:"config_repo"`
-	Excludes      []string     `yaml:"excludes"`
-	IgnoreMissing bool         `yaml:"ignore_missing"`
-	Git           GitConfig    `yaml:"-"`
-	Report        ReportConfig `yaml:"-"`
+	ConfigRepo    string               `yaml:"config_repo"`
+	Excludes      []string             `yaml:"excludes"`
+	IgnoreMissing bool                 `yaml:"ignore_missing"`
+	Actions       map[string]GitConfig `yaml:"-"`
+	Report        ReportConfig         `yaml:"-"`
 }
 
 const RootConfigFileName = ".gitrepoforge-config"
@@ -43,11 +42,11 @@ type rawReportConfig struct {
 }
 
 type rawRootConfig struct {
-	ConfigRepo    string          `yaml:"config_repo"`
-	Excludes      []string        `yaml:"excludes"`
-	IgnoreMissing bool            `yaml:"ignore_missing"`
-	Report        rawReportConfig `yaml:"report"`
-	GitConfig     `yaml:",inline"`
+	ConfigRepo    string               `yaml:"config_repo"`
+	Excludes      []string             `yaml:"excludes"`
+	IgnoreMissing bool                 `yaml:"ignore_missing"`
+	Report        rawReportConfig      `yaml:"report"`
+	Apply         map[string]GitConfig `yaml:"apply"`
 }
 
 func LoadRootConfig(workspaceDir string) (*RootConfig, error) {
@@ -65,7 +64,7 @@ func LoadRootConfig(workspaceDir string) (*RootConfig, error) {
 		ConfigRepo:    raw.ConfigRepo,
 		Excludes:      raw.Excludes,
 		IgnoreMissing: raw.IgnoreMissing,
-		Git:           raw.GitConfig,
+		Actions:       map[string]GitConfig{},
 	}
 	cfg.Report = ReportConfig{
 		CollapseDiffs: true, // default
@@ -76,11 +75,28 @@ func LoadRootConfig(workspaceDir string) (*RootConfig, error) {
 	if cfg.ConfigRepo == "" {
 		return nil, fmt.Errorf("root config %s: config_repo is required", path)
 	}
-	if err := validateGitConfig(&cfg.Git); err != nil {
-		return nil, fmt.Errorf("root config %s: %w", path, err)
+	for name, gitCfg := range raw.Apply {
+		if err := validateGitConfig(&gitCfg); err != nil {
+			return nil, fmt.Errorf("root config %s: apply.%s: %w", path, name, err)
+		}
+		cfg.Actions[name] = gitCfg
 	}
 
 	return &cfg, nil
+}
+
+// ResolveAction returns the GitConfig for the named action. If name is empty,
+// a zero GitConfig (no git automation) is returned. An error is returned when
+// name is non-empty but does not match any configured action.
+func (rc *RootConfig) ResolveAction(name string) (*GitConfig, error) {
+	if name == "" {
+		return &GitConfig{}, nil
+	}
+	action, ok := rc.Actions[name]
+	if !ok {
+		return nil, fmt.Errorf("action %q is not defined in the apply config", name)
+	}
+	return &action, nil
 }
 
 func (g *GitConfig) Normalize() {

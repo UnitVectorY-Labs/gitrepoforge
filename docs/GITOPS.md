@@ -8,9 +8,9 @@ permalink: /reference/git-operations
 
 # Git Operations
 
-gitrepoforge performs Git operations during `apply` when the root config enables them. All operations run inside each target repository using the local `git` CLI and, for pull requests, the GitHub CLI (`gh`). The behavior of each step is controlled by the Git fields in the workspace config (see [Workspace Config](/configuration/workspace)).
+gitrepoforge performs Git operations during `apply` when an action is selected with `--action`. All operations run inside each target repository using the local `git` CLI and, for pull requests, the GitHub CLI (`gh`). The behavior of each step is controlled by the Git fields defined in the named action under the `apply` section of the workspace config (see [Workspace Config](/configuration/workspace)).
 
-If no Git automation is configured, `apply` still writes the managed files; it simply stops before any Git commands.
+If no `--action` flag is provided, `apply` still writes the managed files; it simply skips all Git commands.
 
 ## Branch Creation
 
@@ -74,8 +74,6 @@ If `delete_branch` is `true` and `return_to_original_branch` is also `true`, git
 ```
 git branch -D {branch}
 ```
-
-This mirrors the repver `delete_branch` behavior.
 
 ## Status Checks
 

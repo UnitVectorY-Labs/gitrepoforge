@@ -26,6 +26,7 @@ Several flags are shared across commands:
 | `--repo <name>` | `validate`, `apply`, `report` | Target a single repo by its directory name. |
 | `--json` | `validate`, `apply`, `schema` | Output results as JSON instead of the default format. |
 | `--output <path>` | `report`, `schema` | Write output to a file instead of stdout. |
+| `--action <name>` | `apply` | Named action from the `apply` config to use for Git automation. |
 
 ## Output
 

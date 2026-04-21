@@ -20,6 +20,7 @@ func runApply(version string, args []string) {
 	fs := flag.NewFlagSet("apply", flag.ExitOnError)
 	repoFlag := fs.String("repo", "", "Target a single repo by folder name")
 	jsonFlag := fs.Bool("json", false, "Output in JSON format")
+	actionFlag := fs.String("action", "", "Named action from the apply config to use for git automation")
 	fs.Parse(args)
 
 	workspaceDir, err := os.Getwd()
@@ -44,6 +45,13 @@ func runApply(version string, args []string) {
 	report := output.NewReport(version, "apply", filepath.Join(workspaceDir, config.RootConfigFileName), configRepoPath)
 	report.IgnoreMissing = rootCfg.IgnoreMissing
 
+	gitCfg, err := rootCfg.ResolveAction(*actionFlag)
+	if err != nil {
+		output.Error(fmt.Sprintf("action error: %v", err))
+		os.Exit(1)
+	}
+	actionName := *actionFlag
+
 	var repos []string
 	if *repoFlag != "" {
 		repoPath := filepath.Join(workspaceDir, *repoFlag)
@@ -67,7 +75,7 @@ func runApply(version string, args []string) {
 
 	for _, repoPath := range repos {
 		repoName := filepath.Base(repoPath)
-		result := applyRepo(repoPath, repoName, rootCfg, centralCfg)
+		result := applyRepo(repoPath, repoName, gitCfg, actionName, centralCfg)
 		report.Repos = append(report.Repos, result)
 	}
 
@@ -82,7 +90,7 @@ func runApply(version string, args []string) {
 	}
 }
 
-func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg *config.CentralConfig) output.RepoResult {
+func applyRepo(repoPath, repoName string, gitCfg *config.GitConfig, actionName string, centralCfg *config.CentralConfig) output.RepoResult {
 	if !config.RepoConfigExists(repoPath) {
 		return output.RepoResult{
 			Name:   repoName,
@@ -112,7 +120,7 @@ func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg
 		}
 	}
 
-	if gitValidationErrors := validateRootGitTemplates(rootCfg, repoCfg); len(gitValidationErrors) > 0 {
+	if gitValidationErrors := validateRootGitTemplates(gitCfg, actionName, repoCfg); len(gitValidationErrors) > 0 {
 		return output.RepoResult{
 			Name:             repoName,
 			Status:           "invalid",
@@ -134,16 +142,16 @@ func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, centralCfg
 			Name:   repoName,
 			Status: "clean",
 		}
-		if !rootCfg.Git.Commit {
+		if !gitCfg.Commit {
 			result.StatusDetail = cleanStatusDetail(repoPath)
 		}
 		return result
 	}
 
-	return applyFindingsWithGit(repoPath, repoName, repoCfg, rootCfg, findings)
+	return applyFindingsWithGit(repoPath, repoName, repoCfg, gitCfg, findings)
 }
 
-func applyFindingsWithGit(repoPath, repoName string, repoCfg *config.RepoConfig, rootCfg *config.RootConfig, findings []engine.Finding) output.RepoResult {
+func applyFindingsWithGit(repoPath, repoName string, repoCfg *config.RepoConfig, gitCfg *config.GitConfig, findings []engine.Finding) output.RepoResult {
 	var findingOutputs []output.FindingOutput
 	for _, f := range findings {
 		findingOutputs = append(findingOutputs, output.FindingOutput{
@@ -153,7 +161,7 @@ func applyFindingsWithGit(repoPath, repoName string, repoCfg *config.RepoConfig,
 		})
 	}
 
-	gitEnabled := rootCfg.Git.GitOptionsSpecified()
+	gitEnabled := gitCfg.GitOptionsSpecified()
 	placeholderValues := repoCfg.PlaceholderValues()
 
 	originalBranch := ""
@@ -161,7 +169,7 @@ func applyFindingsWithGit(repoPath, repoName string, repoCfg *config.RepoConfig,
 	createdBranch := false
 
 	restoreOriginalBranch := func() {
-		if !gitEnabled || !rootCfg.Git.ReturnToOriginalBranch || !createdBranch || originalBranch == "" {
+		if !gitEnabled || !gitCfg.ReturnToOriginalBranch || !createdBranch || originalBranch == "" {
 			return
 		}
 		_ = gitops.CheckoutBranch(repoPath, originalBranch)
@@ -194,8 +202,8 @@ func applyFindingsWithGit(repoPath, repoName string, repoCfg *config.RepoConfig,
 		}
 		branchName = originalBranch
 
-		if rootCfg.Git.CreateBranch {
-			branchName = rootCfg.Git.BuildBranchName(placeholderValues)
+		if gitCfg.CreateBranch {
+			branchName = gitCfg.BuildBranchName(placeholderValues)
 			if err := gitops.CreateBranch(repoPath, branchName); err != nil {
 				return output.RepoResult{
 					Name:             repoName,
@@ -216,7 +224,7 @@ func applyFindingsWithGit(repoPath, repoName string, repoCfg *config.RepoConfig,
 		}
 	}
 
-	if rootCfg.Git.Commit {
+	if gitCfg.Commit {
 		if err := gitops.AddAll(repoPath); err != nil {
 			restoreOriginalBranch()
 			return output.RepoResult{
@@ -243,7 +251,7 @@ func applyFindingsWithGit(repoPath, repoName string, repoCfg *config.RepoConfig,
 			}
 		}
 
-		commitMessage := rootCfg.Git.BuildCommitMessage(placeholderValues)
+		commitMessage := gitCfg.BuildCommitMessage(placeholderValues)
 		if err := gitops.Commit(repoPath, commitMessage); err != nil {
 			restoreOriginalBranch()
 			return output.RepoResult{
@@ -253,8 +261,8 @@ func applyFindingsWithGit(repoPath, repoName string, repoCfg *config.RepoConfig,
 			}
 		}
 
-		if rootCfg.Git.Push {
-			if err := gitops.Push(repoPath, rootCfg.Git.Remote, branchName); err != nil {
+		if gitCfg.Push {
+			if err := gitops.Push(repoPath, gitCfg.Remote, branchName); err != nil {
 				restoreOriginalBranch()
 				return output.RepoResult{
 					Name:             repoName,
@@ -263,7 +271,7 @@ func applyFindingsWithGit(repoPath, repoName string, repoCfg *config.RepoConfig,
 				}
 			}
 
-			if rootCfg.Git.PullRequest == config.PullRequestGitHubCLI {
+			if gitCfg.PullRequest == config.PullRequestGitHubCLI {
 				if err := gitops.CreatePR(repoPath); err != nil {
 					output.Warning(fmt.Sprintf("%s: PR creation failed: %v", repoName, err))
 				}
@@ -271,7 +279,7 @@ func applyFindingsWithGit(repoPath, repoName string, repoCfg *config.RepoConfig,
 		}
 	}
 
-	if gitEnabled && rootCfg.Git.ReturnToOriginalBranch {
+	if gitEnabled && gitCfg.ReturnToOriginalBranch {
 		if err := gitops.CheckoutBranch(repoPath, originalBranch); err != nil {
 			return output.RepoResult{
 				Name:             repoName,
@@ -279,7 +287,7 @@ func applyFindingsWithGit(repoPath, repoName string, repoCfg *config.RepoConfig,
 				ValidationErrors: []string{fmt.Sprintf("failed to return to original branch: %v", err)},
 			}
 		}
-		if rootCfg.Git.DeleteBranch && createdBranch {
+		if gitCfg.DeleteBranch && createdBranch {
 			if err := gitops.DeleteBranch(repoPath, branchName); err != nil {
 				output.Warning(fmt.Sprintf("%s: failed to delete branch %s: %v", repoName, branchName, err))
 			}
@@ -293,15 +301,16 @@ func applyFindingsWithGit(repoPath, repoName string, repoCfg *config.RepoConfig,
 	}
 }
 
-func validateRootGitTemplates(rootCfg *config.RootConfig, repoCfg *config.RepoConfig) []string {
+func validateRootGitTemplates(gitCfg *config.GitConfig, actionName string, repoCfg *config.RepoConfig) []string {
 	var errors []string
 	values := repoCfg.PlaceholderValues()
+	prefix := "apply." + actionName
 
-	if rootCfg.Git.CreateBranch {
-		errors = append(errors, validateGitTemplate("git.branch_name", rootCfg.Git.BranchName, values)...)
+	if gitCfg.CreateBranch {
+		errors = append(errors, validateGitTemplate(prefix+".branch_name", gitCfg.BranchName, values)...)
 	}
-	if rootCfg.Git.Commit {
-		errors = append(errors, validateGitTemplate("git.commit_message", rootCfg.Git.CommitMessage, values)...)
+	if gitCfg.Commit {
+		errors = append(errors, validateGitTemplate(prefix+".commit_message", gitCfg.CommitMessage, values)...)
 	}
 
 	return errors

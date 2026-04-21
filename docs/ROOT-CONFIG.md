@@ -20,15 +20,23 @@ excludes:
   - archived-*
 report:
   collapse_diffs: true
-create_branch: true
-branch_name: "gitrepoforge/{{name}}"
-commit: true
-commit_message: "gitrepoforge: apply desired state for {{name}}"
-push: true
-remote: origin
-pull_request: GITHUB_CLI
-return_to_original_branch: true
-delete_branch: true
+apply:
+  stage: {}
+  commit:
+    commit: true
+    commit_message: "gitrepoforge: apply desired state for {{name}}"
+    push: true
+    remote: origin
+  pr:
+    create_branch: true
+    branch_name: "gitrepoforge/{{name}}"
+    commit: true
+    commit_message: "gitrepoforge: apply desired state for {{name}}"
+    push: true
+    remote: origin
+    pull_request: GITHUB_CLI
+    return_to_original_branch: true
+    delete_branch: true
 ```
 {% endraw %}
 
@@ -40,9 +48,29 @@ delete_branch: true
 | `excludes` | no | Repo folder globs to skip during discovery. |
 | `ignore_missing` | no | When `true`, suppresses the warning for repos that have no `.gitrepoforge` file. Defaults to `false`. |
 
-## Git Fields
+## Apply Actions
 
-The Git-related fields in `.gitrepoforge-config` control how `apply` interacts with Git across the workspace. Their shape intentionally mirrors the repver Git config, but they are defined once in the root config and applied to each managed repository.
+The optional `apply` section defines named **actions** that control how `apply` interacts with Git. Each key under `apply` is an action name; its value is a set of Git fields for that action.
+
+```yaml
+apply:
+  <action-name>:
+    <git-fields>
+```
+
+Pass the action name at the command line with `--action`:
+
+```
+gitrepoforge apply --action pr
+```
+
+If `--action` is omitted, no Git automation runs (files are still written).
+
+Multiple actions may be defined to support different workflows — for example a `stage` action that only writes files, a `commit` action that commits directly, and a `pr` action that branches and opens a pull request.
+
+### Git Fields
+
+Each action supports the following fields:
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -77,16 +105,12 @@ The Git-related fields in `.gitrepoforge-config` control how `apply` interacts w
 
 ### Compliant Status Warnings
 
-When `commit` is `false` (or not set), the tool applies file changes without committing them. If a repo is compliant (files match the desired state) but has uncommitted changes in the working tree, the console output includes an additional warning:
+When `commit` is `false` (or not set) in the selected action, the tool applies file changes without committing them. If a repo is compliant (files match the desired state) but has uncommitted changes in the working tree, the console output includes an additional warning:
 
 - **not staged** – the repo has changes that are not staged with git.
 - **staged, not committed** – the repo has changes staged in the index but not yet committed.
 
 These warnings help identify repos where the desired state has been applied but the changes have not been persisted in git.
-
-### Removed Fields
-
-The old Git fields and compatibility aliases are no longer supported. In particular, nested `git:` config, `branch_prefix`, `create_pr`, `bootstrap_commit_message`, `pr_title`, `pr_body`, `bootstrap_pr_title`, and `bootstrap_pr_body` are invalid.
 
 ## Report Fields
 
