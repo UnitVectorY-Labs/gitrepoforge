@@ -167,6 +167,7 @@ func applyFindingsWithGit(repoPath, repoName string, repoCfg *config.RepoConfig,
 	originalBranch := ""
 	branchName := ""
 	createdBranch := false
+	var err error
 
 	restoreOriginalBranch := func() {
 		if !gitEnabled || !gitCfg.ReturnToOriginalBranch || !createdBranch || originalBranch == "" {
