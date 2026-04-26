@@ -8,7 +8,10 @@ import (
 	"strings"
 )
 
-const RepoConfigFileName = ".gitrepoforge"
+const (
+	RepoConfigFileName       = ".gitrepoforge"
+	ManagedFilesManifestName = ".gitrepoforge-managed-files.yaml"
+)
 
 const (
 	// PullRequestNo disables pull request creation.

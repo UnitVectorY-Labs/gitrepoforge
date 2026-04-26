@@ -191,6 +191,9 @@ func listFiles(t *testing.T, root string) []string {
 		if err != nil {
 			return err
 		}
+		if relPath == config.ManagedFilesManifestName {
+			return nil
+		}
 		files = append(files, relPath)
 		return nil
 	})

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/UnitVectorY-Labs/gitrepoforge/internal/config"
+	"github.com/UnitVectorY-Labs/gitrepoforge/internal/output"
 )
 
 func writeCmdTestFile(t *testing.T, dir, relPath, content string) {
@@ -47,6 +48,15 @@ default_branch: main
 config: {}
 `)
 	return repoDir
+}
+
+func resultHasFindingPath(result output.RepoResult, path string) bool {
+	for _, finding := range result.Findings {
+		if finding.FilePath == path {
+			return true
+		}
+	}
+	return false
 }
 
 func TestResolveApplyActionDefaultsToDryRunWhenFlagOmitted(t *testing.T) {
@@ -91,13 +101,24 @@ func TestApplyRepoWithoutActionReportsDriftWithoutWriting(t *testing.T) {
 	if result.Status != "drift" {
 		t.Fatalf("Status = %q, want %q", result.Status, "drift")
 	}
-	if len(result.Findings) != 1 {
-		t.Fatalf("Findings length = %d, want 1", len(result.Findings))
+	if len(result.Findings) != 2 {
+		t.Fatalf("Findings length = %d, want 2", len(result.Findings))
+	}
+	if !resultHasFindingPath(result, "README.md") {
+		t.Fatal("expected README.md finding")
+	}
+	if !resultHasFindingPath(result, config.ManagedFilesManifestName) {
+		t.Fatalf("expected %s finding", config.ManagedFilesManifestName)
 	}
 
 	readmePath := filepath.Join(repoDir, "README.md")
 	if _, err := os.Stat(readmePath); !os.IsNotExist(err) {
 		t.Fatalf("README.md should not have been written, stat err = %v", err)
+	}
+
+	manifestPath := filepath.Join(repoDir, config.ManagedFilesManifestName)
+	if _, err := os.Stat(manifestPath); !os.IsNotExist(err) {
+		t.Fatalf("%s should not have been written, stat err = %v", config.ManagedFilesManifestName, err)
 	}
 }
 
@@ -117,5 +138,18 @@ func TestApplyRepoWithNamedActionAppliesChanges(t *testing.T) {
 	}
 	if string(content) != "managed readme\n" {
 		t.Fatalf("README.md = %q, want %q", string(content), "managed readme\n")
+	}
+
+	manifestPath := filepath.Join(repoDir, config.ManagedFilesManifestName)
+	manifestContent, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatalf("failed to read %s: %v", config.ManagedFilesManifestName, err)
+	}
+	manifestText := string(manifestContent)
+	if !strings.Contains(manifestText, "path: "+config.ManagedFilesManifestName) {
+		t.Fatalf("%s should reference itself, got %q", config.ManagedFilesManifestName, manifestText)
+	}
+	if !strings.Contains(manifestText, "path: README.md") {
+		t.Fatalf("%s should include README.md, got %q", config.ManagedFilesManifestName, manifestText)
 	}
 }

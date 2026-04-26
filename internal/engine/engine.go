@@ -57,6 +57,16 @@ func ComputeFindings(repoCfg *config.RepoConfig, centralCfg *config.CentralConfi
 		findings = append(findings, ruleFindings...)
 	}
 
+	manifestContent, err := renderManagedFilesManifest(data, centralCfg)
+	if err != nil {
+		return nil, fmt.Errorf("error rendering managed files manifest: %w", err)
+	}
+	manifestFindings, err := evaluateWholeFileRule(config.FileRule{Path: config.ManagedFilesManifestName}, manifestContent, repoPath)
+	if err != nil {
+		return nil, fmt.Errorf("error evaluating managed files manifest: %w", err)
+	}
+	findings = append(findings, manifestFindings...)
+
 	return findings, nil
 }
 

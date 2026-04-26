@@ -22,6 +22,21 @@ func writeTestFile(t *testing.T, dir, relPath, content string) string {
 	return fullPath
 }
 
+func withoutManagedFilesManifest(findings []Finding) []Finding {
+	cloned := append([]Finding(nil), findings...)
+	return stripManagedFilesManifest(cloned)
+}
+
+func requireManagedFilesManifestFinding(t *testing.T, findings []Finding) Finding {
+	t.Helper()
+
+	finding := managedFilesManifestFinding(findings)
+	if finding == nil {
+		t.Fatalf("expected %s finding", config.ManagedFilesManifestName)
+	}
+	return *finding
+}
+
 func TestComputeFindingsSelectsMatchingTemplate(t *testing.T) {
 	configRepo := t.TempDir()
 	writeTestFile(t, configRepo, "templates/licenses/mit.tmpl", "MIT License\n{{.Name}}\n")
@@ -58,6 +73,7 @@ func TestComputeFindingsSelectsMatchingTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ComputeFindings returned error: %v", err)
 	}
+	findings = withoutManagedFilesManifest(findings)
 	if len(findings) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(findings))
 	}
@@ -128,6 +144,7 @@ func TestComputeFindingsAppliesDefaultsBeforeSelectingTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ComputeFindings returned error: %v", err)
 	}
+	findings = withoutManagedFilesManifest(findings)
 	if len(findings) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(findings))
 	}
@@ -185,6 +202,7 @@ build:
 	if err != nil {
 		t.Fatalf("ComputeFindings returned error: %v", err)
 	}
+	findings = withoutManagedFilesManifest(findings)
 	if len(findings) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(findings))
 	}
@@ -235,6 +253,7 @@ jobs:
 	if err != nil {
 		t.Fatalf("ComputeFindings returned error: %v", err)
 	}
+	findings = withoutManagedFilesManifest(findings)
 	if len(findings) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(findings))
 	}
@@ -282,6 +301,7 @@ go-version: {{ .Config.versions.go | quote_double }}
 	if err != nil {
 		t.Fatalf("ComputeFindings returned error: %v", err)
 	}
+	findings = withoutManagedFilesManifest(findings)
 	if len(findings) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(findings))
 	}
@@ -367,6 +387,7 @@ func TestComputeFindingsMaterializesNestedDefaultsForOptionalObjects(t *testing.
 	if err != nil {
 		t.Fatalf("ComputeFindings returned error: %v", err)
 	}
+	findings = withoutManagedFilesManifest(findings)
 	if len(findings) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(findings))
 	}
@@ -426,6 +447,7 @@ func TestComputeFindingsExistsConditionUsesExplicitConfig(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ComputeFindings returned error: %v", err)
 		}
+		findings = withoutManagedFilesManifest(findings)
 		if len(findings) != 0 {
 			t.Fatalf("expected 0 findings, got %d", len(findings))
 		}
@@ -455,6 +477,7 @@ func TestComputeFindingsExistsConditionUsesExplicitConfig(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ComputeFindings returned error: %v", err)
 		}
+		findings = withoutManagedFilesManifest(findings)
 		if len(findings) != 1 {
 			t.Fatalf("expected 1 finding, got %d", len(findings))
 		}
@@ -479,6 +502,7 @@ func TestComputeFindingsExistsConditionUsesExplicitConfig(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ComputeFindings returned error: %v", err)
 		}
+		findings = withoutManagedFilesManifest(findings)
 		if len(findings) != 0 {
 			t.Fatalf("expected 0 findings, got %d", len(findings))
 		}
@@ -521,11 +545,148 @@ func TestComputeFindingsDeletesFileWhenAbsentCandidateMatches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ComputeFindings returned error: %v", err)
 	}
+	findings = withoutManagedFilesManifest(findings)
 	if len(findings) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(findings))
 	}
 	if findings[0].Operation != "delete" {
 		t.Fatalf("Operation = %q, want %q", findings[0].Operation, "delete")
+	}
+}
+
+func TestComputeFindingsAddsManagedFilesManifest(t *testing.T) {
+	configRepo := t.TempDir()
+	writeTestFile(t, configRepo, "templates/licenses/mit.tmpl", "MIT License\n")
+	writeTestFile(t, configRepo, "templates/README.md.tmpl", `{{ section start=start_of_file end=contains("<!-- END MANAGED -->") }}
+# Example Repo
+<!-- END MANAGED -->
+{{ end }}
+`)
+	writeTestFile(t, configRepo, "templates/NOTICE.tmpl", `{{ bootstrap }}
+Bootstrap only
+{{ end }}
+`)
+
+	centralCfg := &config.CentralConfig{
+		Files: []config.FileRule{
+			{
+				Path: "LICENSE",
+				Templates: []config.TemplateRef{
+					{
+						Template:     "licenses/mit.tmpl",
+						ResolvedPath: filepath.Join(configRepo, "templates", "licenses", "mit.tmpl"),
+					},
+				},
+			},
+			{
+				Path: "README.md",
+				Templates: []config.TemplateRef{
+					{
+						Template:     "README.md.tmpl",
+						ResolvedPath: filepath.Join(configRepo, "templates", "README.md.tmpl"),
+					},
+				},
+			},
+			{
+				Path: "NOTICE",
+				Templates: []config.TemplateRef{
+					{
+						Template:     "NOTICE.tmpl",
+						ResolvedPath: filepath.Join(configRepo, "templates", "NOTICE.tmpl"),
+					},
+				},
+			},
+		},
+	}
+	repoCfg := &config.RepoConfig{
+		Name:          "example-repo",
+		DefaultBranch: "main",
+	}
+
+	findings, err := ComputeFindings(repoCfg, centralCfg, t.TempDir())
+	if err != nil {
+		t.Fatalf("ComputeFindings returned error: %v", err)
+	}
+
+	manifestFinding := requireManagedFilesManifestFinding(t, findings)
+	if manifestFinding.Operation != "create" {
+		t.Fatalf("Operation = %q, want %q", manifestFinding.Operation, "create")
+	}
+
+	manifest, err := parseManagedFilesManifest(manifestFinding.Expected)
+	if err != nil {
+		t.Fatalf("parseManagedFilesManifest returned error: %v", err)
+	}
+	if got, want := managedFilePaths(manifest.ManagedFiles), []string{
+		".gitrepoforge-managed-files.yaml",
+		"LICENSE",
+		"README.md",
+	}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("managed file paths = %v, want %v", got, want)
+	}
+
+	for _, entry := range manifest.ManagedFiles {
+		if entry.Path != "README.md" {
+			continue
+		}
+		if entry.Management != "sections" {
+			t.Fatalf("README.md management = %q, want %q", entry.Management, "sections")
+		}
+		if len(entry.Sections) != 1 {
+			t.Fatalf("README.md sections length = %d, want 1", len(entry.Sections))
+		}
+		if entry.Sections[0].Start != "start_of_file" {
+			t.Fatalf("README.md section start = %q, want %q", entry.Sections[0].Start, "start_of_file")
+		}
+		if entry.Sections[0].End != `contains("<!-- END MANAGED -->")` {
+			t.Fatalf("README.md section end = %q, want %q", entry.Sections[0].End, `contains("<!-- END MANAGED -->")`)
+		}
+		return
+	}
+
+	t.Fatal("expected README.md manifest entry")
+}
+
+func TestComputeFindingsTreatsManagedFilesManifestAsCleanWhenCurrent(t *testing.T) {
+	configRepo := t.TempDir()
+	writeTestFile(t, configRepo, "templates/licenses/mit.tmpl", "MIT License\n")
+
+	centralCfg := &config.CentralConfig{
+		Files: []config.FileRule{
+			{
+				Path: "LICENSE",
+				Templates: []config.TemplateRef{
+					{
+						Template:     "licenses/mit.tmpl",
+						ResolvedPath: filepath.Join(configRepo, "templates", "licenses", "mit.tmpl"),
+					},
+				},
+			},
+		},
+	}
+	repoCfg := &config.RepoConfig{
+		Name:          "example-repo",
+		DefaultBranch: "main",
+	}
+	repoPath := t.TempDir()
+	writeTestFile(t, repoPath, "LICENSE", "MIT License\n")
+
+	manifestContent, err := renderManagedFilesManifest(TemplateData{
+		Name:          repoCfg.Name,
+		DefaultBranch: repoCfg.DefaultBranch,
+		Config:        map[string]interface{}{},
+	}, centralCfg)
+	if err != nil {
+		t.Fatalf("renderManagedFilesManifest returned error: %v", err)
+	}
+	writeTestFile(t, repoPath, config.ManagedFilesManifestName, manifestContent)
+
+	findings, err := ComputeFindings(repoCfg, centralCfg, repoPath)
+	if err != nil {
+		t.Fatalf("ComputeFindings returned error: %v", err)
+	}
+	if managedFilesManifestFinding(findings) != nil {
+		t.Fatalf("expected %s to be clean", config.ManagedFilesManifestName)
 	}
 }
 
