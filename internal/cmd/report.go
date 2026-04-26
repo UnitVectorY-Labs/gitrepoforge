@@ -76,7 +76,7 @@ func runReport(version string, args []string) {
 			continue
 		}
 
-		findings, err := engine.ComputeFindings(repoCfg, centralCfg, repoPath)
+		findings, err := engine.ComputeFindings(repoCfg, centralCfg, repoPath, config.ResolveManifestPath(rootCfg, repoCfg))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "  warning: %s: %v\n", repoName, err)
 			continue

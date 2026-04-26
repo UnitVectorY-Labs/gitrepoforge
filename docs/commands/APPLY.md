@@ -28,9 +28,9 @@ gitrepoforge apply [flags]
 2. If `--action` is omitted:
    - Reports `drift` findings without writing files.
 3. If `--action` is provided:
-   - Resolves the named action from the `action` config in `.gitrepoforge-config`.
-   - For each repo with findings, applies file changes (`create`, `update`, `delete`).
-   - If Git automation is enabled for the selected action, requires a clean working tree before running Git commands.
+    - Resolves the named action from the `action` config in `.gitrepoforge-config`.
+    - For each repo with findings, applies file changes (`create`, `update`, `delete`), including the generated managed-files manifest at the resolved `manifest` path.
+    - If Git automation is enabled for the selected action, requires a clean working tree before running Git commands.
    - If `create_branch` is `true`, creates the configured branch from the repo's current branch.
    - If `commit` is `true`, stages and commits the changes.
    - If `push` is `true`, pushes the active branch to `remote`.
@@ -52,3 +52,5 @@ gitrepoforge apply [flags]
 | `failed` | An error occurred during Git operations. |
 
 When `commit` is not enabled in the selected action and a repo is `clean`, the same `compliant (not staged)` or `compliant (staged, not committed)` warnings described in the [validate](VALIDATE.md) section apply here as well.
+
+See [Managed Files Manifest](/reference/managed-files-manifest) for the generated manifest file format and behavior.

@@ -15,3 +15,4 @@ Detailed reference documentation for gitrepoforge features.
 | [Template Files](/reference/templates) | Template rendering, directives, helper functions, and section management. |
 | [Condition Syntax](/reference/conditions) | Boolean condition expressions used in output rule candidate selection. |
 | [Git Operations](/reference/git-operations) | Git automation steps performed during `apply` including branching, committing, pushing, and pull request creation. |
+| [Managed Files Manifest](/reference/managed-files-manifest) | Generated per-repo inventory of fully managed files and section-managed boundaries. |

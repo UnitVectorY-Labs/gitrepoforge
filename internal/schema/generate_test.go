@@ -65,6 +65,17 @@ func TestGenerateJSONSchemaBasic(t *testing.T) {
 	if len(configProp.Required) != 1 || configProp.Required[0] != "license" {
 		t.Fatalf("config required = %v, want [license]", configProp.Required)
 	}
+
+	manifestProp, ok := schema.Properties["manifest"]
+	if !ok {
+		t.Fatal("missing manifest property")
+	}
+	if manifestProp.Type != "string" {
+		t.Fatalf("manifest type = %q, want string", manifestProp.Type)
+	}
+	if manifestProp.Default != config.ManagedFilesManifestName {
+		t.Fatalf("manifest default = %v, want %q", manifestProp.Default, config.ManagedFilesManifestName)
+	}
 }
 
 func TestGenerateJSONSchemaNoRequired(t *testing.T) {

@@ -28,8 +28,8 @@ gitrepoforge validate [flags]
 2. Discovers Git repos in the workspace (or targets the single `--repo`).
 3. For each repo:
    - If no `.gitrepoforge` file exists, the repo is **skipped**.
-   - Validates the per-repo config, including `default_branch`, against the shared config schema.
-   - Selects template files, renders them, and compares them to the current file state.
+   - Validates the per-repo config, including `default_branch` and any configured `manifest` path, against the shared config schema.
+   - Selects template files, renders them, and compares them to the current file state, including the managed-files manifest at its resolved path.
 4. Reports each repo's status.
 
 When `--verbose` is set, drift findings also include per-file diffs showing removed lines in red and added lines in green.

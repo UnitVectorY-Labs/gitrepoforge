@@ -10,6 +10,8 @@ type diffOp struct {
 	line string
 }
 
+const maxDiffMatrixCells uint64 = 1 << 22
+
 // RenderDiff returns a colorized git-style line diff for a finding.
 func RenderDiff(f FindingOutput) []string {
 	if f.Operation != "create" && f.Operation != "update" && f.Operation != "delete" {
@@ -49,9 +51,14 @@ func diffLines(actual, expected string) []diffOp {
 	oldLines := splitLines(actual)
 	newLines := splitLines(expected)
 
-	dp := make([][]int, len(oldLines)+1)
+	rows, cols, ok := safeDiffMatrixDimensions(len(oldLines), len(newLines))
+	if !ok {
+		return fallbackDiffLines(oldLines, newLines)
+	}
+
+	dp := make([][]int, rows)
 	for i := range dp {
-		dp[i] = make([]int, len(newLines)+1)
+		dp[i] = make([]int, cols)
 	}
 
 	for i := len(oldLines) - 1; i >= 0; i-- {
@@ -92,6 +99,42 @@ func diffLines(actual, expected string) []diffOp {
 	}
 
 	return ops
+}
+
+func safeDiffMatrixDimensions(oldLen, newLen int) (int, int, bool) {
+	const maxInt = int(^uint(0) >> 1)
+
+	if oldLen < 0 || newLen < 0 || oldLen >= maxInt || newLen >= maxInt {
+		return 0, 0, false
+	}
+
+	rows := oldLen + 1
+	cols := newLen + 1
+	if uint64(rows)*uint64(cols) > maxDiffMatrixCells {
+		return 0, 0, false
+	}
+
+	return rows, cols, true
+}
+
+func fallbackDiffLines(oldLines, newLines []string) []diffOp {
+	ops := make([]diffOp, 0, safeCombinedLength(len(oldLines), len(newLines)))
+	for _, line := range oldLines {
+		ops = append(ops, diffOp{kind: "delete", line: line})
+	}
+	for _, line := range newLines {
+		ops = append(ops, diffOp{kind: "insert", line: line})
+	}
+	return ops
+}
+
+func safeCombinedLength(a, b int) int {
+	const maxInt = int(^uint(0) >> 1)
+
+	if a < 0 || b < 0 || a > maxInt-b {
+		return 0
+	}
+	return a + b
 }
 
 func splitLines(content string) []string {

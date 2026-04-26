@@ -18,6 +18,10 @@ properties:
     default_branch:
         description: The default branch of the repository.
         type: string
+    manifest:
+        default: .managedfiles
+        description: Relative path for the generated managed files manifest.
+        type: string
     name:
         description: Must match the repository folder name.
         type: string
