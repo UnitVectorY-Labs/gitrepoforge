@@ -54,7 +54,7 @@ func renderManagedFilesManifest(data TemplateData, centralCfg *config.CentralCon
 	if err != nil {
 		return "", fmt.Errorf("marshal managed files manifest: %w", err)
 	}
-	if len(body) == 0 || body[len(body)-1] != '\n' {
+	if !bytes.HasSuffix(body, []byte("\n")) {
 		body = append(body, '\n')
 	}
 
@@ -135,7 +135,7 @@ func renderBoundaryHint(boundary Boundary) string {
 }
 
 func stripManagedFilesManifest(findings []Finding) []Finding {
-	filtered := findings[:0]
+	filtered := make([]Finding, 0, len(findings))
 	for _, finding := range findings {
 		if finding.FilePath == config.ManagedFilesManifestName {
 			continue
