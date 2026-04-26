@@ -33,6 +33,7 @@ action:
     branch_name: "gitrepoforge/{{name}}"
     commit: true
     commit_message: "gitrepoforge: apply desired state for {{name}}"
+    on_default_branch: true
     push: true
     remote: origin
     pull_request: GITHUB_CLI
@@ -82,6 +83,7 @@ Each action supports the following fields:
 | `branch_name` | string | Yes* | Name for the new branch. Supports {% raw %}`{{param}}`{% endraw %} placeholders. *Required if `create_branch` is true. |
 | `commit` | boolean | No | Commit the changes after modification. |
 | `commit_message` | string | Yes* | Commit message. Supports {% raw %}`{{param}}`{% endraw %} placeholders. *Required if `commit` is true. |
+| `on_default_branch` | boolean | No | When `true`, fail the action unless the repo is currently on the branch named by `.gitrepoforge` `default_branch`. Defaults to `false`. |
 | `push` | boolean | No | Push the branch to the remote repository. |
 | `remote` | string | Yes* | Git remote name (for example `origin`). *Required if `push` is true. |
 | `pull_request` | string | No | Create a pull request. Values: `NO` (default), `GITHUB_CLI`. |
@@ -105,6 +107,7 @@ Each action supports the following fields:
 - `pull_request` requires `push` to be `true`.
 - `return_to_original_branch` requires `create_branch` to be `true`.
 - `delete_branch` requires `return_to_original_branch` to be `true`.
+- `on_default_branch` defaults to `false`; when enabled, the action only runs if the repo is currently on its configured `default_branch`.
 - Unknown placeholders in `branch_name` or `commit_message` are rejected for the affected repo.
 
 ### Compliant Status Warnings
