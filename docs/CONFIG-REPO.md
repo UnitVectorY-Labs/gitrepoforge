@@ -144,7 +144,7 @@ They cannot be declared under `config/` and must not appear inside the repo's `c
 
 Each output rule maps to one target file. The relative path under `outputs/`, without the `.gitrepoforge` suffix, becomes the managed file path in the repo.
 Every file under `outputs/` must end with `.gitrepoforge`; unexpected filenames are treated as config errors so typos are not silently ignored.
-gitrepoforge also derives a generated `.gitrepoforge-managed-files.yaml` file for each managed repo that inventories the selected whole-file and section-based outputs for that repo.
+gitrepoforge also derives a generated `.managedfiles.yaml` file for each managed repo that inventories the selected whole-file and section-based outputs for that repo.
 
 **`outputs/LICENSE.gitrepoforge`**
 

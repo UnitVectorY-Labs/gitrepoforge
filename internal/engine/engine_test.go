@@ -618,12 +618,16 @@ Bootstrap only
 	if err != nil {
 		t.Fatalf("parseManagedFilesManifest returned error: %v", err)
 	}
-	if got, want := managedFilePaths(manifest.ManagedFiles), []string{
-		".gitrepoforge-managed-files.yaml",
+	gotPaths := make([]string, 0, len(manifest.ManagedFiles))
+	for _, entry := range manifest.ManagedFiles {
+		gotPaths = append(gotPaths, entry.Path)
+	}
+	if want := []string{
+		".managedfiles.yaml",
 		"LICENSE",
 		"README.md",
-	}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("managed file paths = %v, want %v", got, want)
+	}; !reflect.DeepEqual(gotPaths, want) {
+		t.Fatalf("managed file paths = %v, want %v", gotPaths, want)
 	}
 
 	for _, entry := range manifest.ManagedFiles {

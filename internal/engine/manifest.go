@@ -12,6 +12,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	managedFileTypeFile     = "file"
+	managedFileTypeSections = "sections"
+)
+
 type managedFilesManifest struct {
 	ManagedFiles []managedFileEntry `yaml:"managed_files"`
 }
@@ -41,7 +46,7 @@ func renderManagedFilesManifest(data TemplateData, centralCfg *config.CentralCon
 
 	entries = append(entries, managedFileEntry{
 		Path:       config.ManagedFilesManifestName,
-		Management: "whole_file",
+		Management: managedFileTypeFile,
 	})
 
 	sort.Slice(entries, func(i, j int) bool {
@@ -95,7 +100,7 @@ func describeManagedFile(rule config.FileRule, data TemplateData) (managedFileEn
 	if parsed.IsWholeFile {
 		return managedFileEntry{
 			Path:       rule.Path,
-			Management: "whole_file",
+			Management: managedFileTypeFile,
 		}, true, nil
 	}
 
@@ -113,7 +118,7 @@ func describeManagedFile(rule config.FileRule, data TemplateData) (managedFileEn
 
 	return managedFileEntry{
 		Path:       rule.Path,
-		Management: "sections",
+		Management: managedFileTypeSections,
 		Sections:   sections,
 	}, true, nil
 }

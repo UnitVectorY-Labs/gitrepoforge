@@ -10,7 +10,7 @@ import (
 
 const (
 	RepoConfigFileName       = ".gitrepoforge"
-	ManagedFilesManifestName = ".gitrepoforge-managed-files.yaml"
+	ManagedFilesManifestName = ".managedfiles.yaml"
 )
 
 const (
