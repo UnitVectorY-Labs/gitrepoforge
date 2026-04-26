@@ -1,0 +1,20 @@
+$schema: http://json-schema.org/draft-07/schema#
+additionalProperties: false
+properties:
+    config:
+        additionalProperties: false
+        type: object
+    default_branch:
+        description: The default branch of the repository.
+        type: string
+    manifest:
+        default: .managedfiles
+        description: Relative path for the generated managed files manifest.
+        type: string
+    name:
+        description: Must match the repository folder name.
+        type: string
+required:
+    - default_branch
+    - name
+type: object

@@ -32,6 +32,7 @@ type RootConfig struct {
 	ConfigRepo    string               `yaml:"config_repo"`
 	Excludes      []string             `yaml:"excludes"`
 	IgnoreMissing bool                 `yaml:"ignore_missing"`
+	Manifest      string               `yaml:"manifest"`
 	Actions       map[string]GitConfig `yaml:"-"`
 	Report        ReportConfig         `yaml:"-"`
 }
@@ -46,6 +47,7 @@ type rawRootConfig struct {
 	ConfigRepo    string               `yaml:"config_repo"`
 	Excludes      []string             `yaml:"excludes"`
 	IgnoreMissing bool                 `yaml:"ignore_missing"`
+	Manifest      string               `yaml:"manifest"`
 	Report        rawReportConfig      `yaml:"report"`
 	Action        map[string]GitConfig `yaml:"action"`
 }
@@ -65,6 +67,7 @@ func LoadRootConfig(workspaceDir string) (*RootConfig, error) {
 		ConfigRepo:    raw.ConfigRepo,
 		Excludes:      raw.Excludes,
 		IgnoreMissing: raw.IgnoreMissing,
+		Manifest:      raw.Manifest,
 	}
 	cfg.Report = ReportConfig{
 		CollapseDiffs: true, // default
@@ -74,6 +77,10 @@ func LoadRootConfig(workspaceDir string) (*RootConfig, error) {
 	}
 	if cfg.ConfigRepo == "" {
 		return nil, fmt.Errorf("root config %s: config_repo is required", path)
+	}
+	cfg.Manifest, err = validateAndNormalizeManifestPath(cfg.Manifest)
+	if err != nil {
+		return nil, fmt.Errorf("root config %s: %w", path, err)
 	}
 	actions := make(map[string]GitConfig, len(raw.Action))
 	for name, gitCfg := range raw.Action {

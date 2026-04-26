@@ -49,6 +49,14 @@ func TestScenarioTestdata(t *testing.T) {
 			if err != nil {
 				t.Fatalf("LoadRepoConfig returned error: %v", err)
 			}
+			rootCfg := &config.RootConfig{}
+			rootConfigPath := filepath.Join(workspace, config.RootConfigFileName)
+			if _, err := os.Stat(rootConfigPath); err == nil {
+				rootCfg, err = config.LoadRootConfig(workspace)
+				if err != nil {
+					t.Fatalf("LoadRootConfig returned error: %v", err)
+				}
+			}
 
 			if expectedValidation := readOptionalFile(t, filepath.Join(caseDir, "validation-errors.txt")); expectedValidation != "" {
 				var got []string
@@ -68,7 +76,7 @@ func TestScenarioTestdata(t *testing.T) {
 				t.Fatalf("unexpected validation errors: %v", validationErrs)
 			}
 
-			findings, err := ComputeFindings(repoCfg, centralCfg, repoPath)
+			findings, err := ComputeFindings(repoCfg, centralCfg, repoPath, config.ResolveManifestPath(rootCfg, repoCfg))
 			if err != nil {
 				t.Fatalf("ComputeFindings returned error: %v", err)
 			}
@@ -106,7 +114,7 @@ func assertExpectedError(t *testing.T, stage, expected string, loadErr error, re
 		if errs := schema.ValidateRepoConfig(repoCfg, centralCfg, repoPath); len(errs) != 0 {
 			t.Fatalf("unexpected validation errors: %v", errs)
 		}
-		_, err = ComputeFindings(repoCfg, centralCfg, repoPath)
+		_, err = ComputeFindings(repoCfg, centralCfg, repoPath, config.ResolveManifestPath(&config.RootConfig{}, repoCfg))
 		if err == nil {
 			t.Fatal("expected compute error, got nil")
 		}

@@ -1,0 +1,4 @@
+name: repo
+default_branch: main
+manifest: .repo-managedfiles
+config: {}

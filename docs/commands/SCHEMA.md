@@ -33,7 +33,7 @@ gitrepoforge schema [flags]
 
 The generated schema includes the following:
 
-- **Top-level fields**: `name` (string, required), `default_branch` (string, required), and `config` (object).
+- **Top-level fields**: `name` (string, required), `default_branch` (string, required), `manifest` (string, optional, default `.managedfiles`), and `config` (object).
 - The `config` property mirrors the config definitions: types are mapped to JSON Schema types (`string` → `string`, `boolean` → `boolean`, `number` → `number`, `list` → `array`, `object` → `object`).
 - Enum constraints, patterns, default values, descriptions, and required fields are preserved in the schema.
 - `additionalProperties: false` is set on all objects to enforce strict validation.

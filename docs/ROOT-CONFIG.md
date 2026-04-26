@@ -15,6 +15,7 @@ The root config lives at the workspace root, outside the managed repos, in `.git
 {% raw %}
 ```yaml
 config_repo: config-repo
+manifest: .managedfiles
 ignore_missing: false
 excludes:
   - archived-*
@@ -46,8 +47,11 @@ action:
 | Field | Required | Description |
 |-------|----------|-------------|
 | `config_repo` | yes | Relative or absolute path to the config repo. |
+| `manifest` | no | Default relative path for the generated managed files manifest in managed repos. A repo-level `manifest` value overrides it. Defaults to `.managedfiles`. |
 | `excludes` | no | Repo folder globs to skip during discovery. |
 | `ignore_missing` | no | When `true`, suppresses the warning for repos that have no `.gitrepoforge` file. Defaults to `false`. |
+
+If both workspace and repo configs set `manifest`, the repo value wins.
 
 ## Actions
 

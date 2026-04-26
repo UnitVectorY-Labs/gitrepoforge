@@ -98,7 +98,7 @@ func runValidate(version string, args []string) {
 			continue
 		}
 
-		findings, err := engine.ComputeFindings(repoCfg, centralCfg, repoPath)
+		findings, err := engine.ComputeFindings(repoCfg, centralCfg, repoPath, config.ResolveManifestPath(rootCfg, repoCfg))
 		if err != nil {
 			report.Repos = append(report.Repos, output.RepoResult{
 				Name:             repoName,
@@ -110,8 +110,8 @@ func runValidate(version string, args []string) {
 
 		if len(findings) == 0 {
 			result := output.RepoResult{
-				Name:   repoName,
-				Status: "clean",
+				Name:         repoName,
+				Status:       "clean",
 				StatusDetail: cleanStatusDetail(repoPath),
 			}
 			report.Repos = append(report.Repos, result)
