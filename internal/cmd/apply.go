@@ -74,7 +74,7 @@ func runApply(version string, args []string) {
 
 	for _, repoPath := range repos {
 		repoName := filepath.Base(repoPath)
-		result := applyRepo(repoPath, repoName, gitCfg, actionName, centralCfg)
+		result := applyRepo(repoPath, repoName, rootCfg, gitCfg, actionName, centralCfg)
 		report.Repos = append(report.Repos, result)
 	}
 
@@ -89,7 +89,7 @@ func runApply(version string, args []string) {
 	}
 }
 
-func applyRepo(repoPath, repoName string, gitCfg *config.GitConfig, actionName string, centralCfg *config.CentralConfig) output.RepoResult {
+func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, gitCfg *config.GitConfig, actionName string, centralCfg *config.CentralConfig) output.RepoResult {
 	if !config.RepoConfigExists(repoPath) {
 		return output.RepoResult{
 			Name:   repoName,
@@ -127,7 +127,7 @@ func applyRepo(repoPath, repoName string, gitCfg *config.GitConfig, actionName s
 		}
 	}
 
-	findings, err := engine.ComputeFindings(repoCfg, centralCfg, repoPath)
+	findings, err := engine.ComputeFindings(repoCfg, centralCfg, repoPath, config.ResolveManifestPath(rootCfg, repoCfg))
 	if err != nil {
 		return output.RepoResult{
 			Name:             repoName,

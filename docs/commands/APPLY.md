@@ -29,7 +29,7 @@ gitrepoforge apply [flags]
    - Reports `drift` findings without writing files.
 3. If `--action` is provided:
     - Resolves the named action from the `action` config in `.gitrepoforge-config`.
-    - For each repo with findings, applies file changes (`create`, `update`, `delete`), including the generated `.managedfiles.yaml` manifest.
+    - For each repo with findings, applies file changes (`create`, `update`, `delete`), including the generated managed-files manifest at the resolved `manifest` path.
     - If Git automation is enabled for the selected action, requires a clean working tree before running Git commands.
    - If `create_branch` is `true`, creates the configured branch from the repo's current branch.
    - If `commit` is `true`, stages and commits the changes.

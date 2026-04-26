@@ -10,7 +10,7 @@ import (
 
 const (
 	RepoConfigFileName       = ".gitrepoforge"
-	ManagedFilesManifestName = ".managedfiles.yaml"
+	ManagedFilesManifestName = ".managedfiles"
 )
 
 const (
@@ -26,6 +26,7 @@ var gitPlaceholderRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 type RepoConfig struct {
 	Name          string                 `yaml:"name"`
 	DefaultBranch string                 `yaml:"default_branch"`
+	Manifest      string                 `yaml:"manifest"`
 	Config        map[string]interface{} `yaml:"config"`
 }
 
@@ -37,6 +38,10 @@ func LoadRepoConfig(repoPath string) (*RepoConfig, error) {
 	}
 	var cfg RepoConfig
 	if err := unmarshalYAMLKnownFields(data, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse repo config %s: %w", path, err)
+	}
+	cfg.Manifest, err = validateAndNormalizeManifestPath(cfg.Manifest)
+	if err != nil {
 		return nil, fmt.Errorf("failed to parse repo config %s: %w", path, err)
 	}
 	return &cfg, nil
@@ -91,4 +96,32 @@ func substituteGitPlaceholders(value string, values map[string]string) string {
 		result = strings.ReplaceAll(result, "{{"+key+"}}", replacement)
 	}
 	return result
+}
+
+func ResolveManifestPath(rootCfg *RootConfig, repoCfg *RepoConfig) string {
+	if repoCfg != nil && repoCfg.Manifest != "" {
+		return repoCfg.Manifest
+	}
+	if rootCfg != nil && rootCfg.Manifest != "" {
+		return rootCfg.Manifest
+	}
+	return ManagedFilesManifestName
+}
+
+func validateAndNormalizeManifestPath(path string) (string, error) {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return "", nil
+	}
+	if filepath.IsAbs(trimmed) {
+		return "", fmt.Errorf("manifest must be a relative path")
+	}
+	cleanPath := filepath.Clean(trimmed)
+	if cleanPath == "." || cleanPath == "" {
+		return "", fmt.Errorf("manifest must not be empty")
+	}
+	if cleanPath == ".." || strings.HasPrefix(cleanPath, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("manifest must stay within the repository")
+	}
+	return cleanPath, nil
 }

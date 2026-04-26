@@ -67,6 +67,7 @@ const (
 var reservedConfigNames = map[string]struct{}{
 	"name":           {},
 	"default_branch": {},
+	"manifest":       {},
 	"config":         {},
 }
 

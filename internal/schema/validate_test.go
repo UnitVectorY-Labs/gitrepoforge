@@ -112,6 +112,25 @@ func TestValidateRepoConfig(t *testing.T) {
 		}
 	})
 
+	t.Run("manifest top level field is rejected in config map", func(t *testing.T) {
+		repoCfg := &config.RepoConfig{
+			Name:          "example-repo",
+			DefaultBranch: "main",
+			Config: map[string]interface{}{
+				"license":  "mit",
+				"manifest": ".managedfiles",
+			},
+		}
+
+		errs := ValidateRepoConfig(repoCfg, centralCfg, filepath.Join(t.TempDir(), "example-repo"))
+		if len(errs) != 1 {
+			t.Fatalf("expected 1 validation error, got %d: %v", len(errs), errs)
+		}
+		if errs[0].Field != "config.manifest" {
+			t.Fatalf("Field = %q, want %q", errs[0].Field, "config.manifest")
+		}
+	})
+
 	t.Run("enum mismatch", func(t *testing.T) {
 		repoCfg := &config.RepoConfig{
 			Name:          "example-repo",

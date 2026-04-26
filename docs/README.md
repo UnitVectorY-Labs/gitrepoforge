@@ -29,10 +29,10 @@ workspace/
 │           └── mit.tmpl
 ├── repo-a/
 │   ├── .gitrepoforge           # Per-repo config with name, default branch, and config values
-│   └── .managedfiles.yaml
+│   └── .managedfiles
 ├── repo-b/
 │   ├── .gitrepoforge
-│   └── .managedfiles.yaml
+│   └── .managedfiles
 └── ...
 ```
 
@@ -53,7 +53,7 @@ workspace/
 3. For each repo that has a `.gitrepoforge` file:
    - **Validate** repo metadata and config values against the shared schema.
    - **Compute findings** by selecting a matching template and comparing the rendered file to disk.
-4. **Maintain** `.managedfiles.yaml` so each repo has a generated inventory of files and managed sections.
+4. **Maintain** `.managedfiles` (or the configured `manifest` path) so each repo has a generated inventory of files and managed sections.
 5. **Report** findings (`validate`) or **apply** them, optionally followed by root-configured Git operations (`apply`).
 
 ### Commands

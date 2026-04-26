@@ -36,6 +36,33 @@ func TestLoadRootConfig(t *testing.T) {
 	}
 }
 
+func TestLoadRootConfigManifest(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, "config_repo: config-repo\nmanifest: .workspace-managedfiles\n")
+
+	cfg, err := LoadRootConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadRootConfig returned error: %v", err)
+	}
+
+	if cfg.Manifest != ".workspace-managedfiles" {
+		t.Fatalf("Manifest = %q, want %q", cfg.Manifest, ".workspace-managedfiles")
+	}
+}
+
+func TestLoadRootConfigRejectsManifestOutsideWorkspace(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RootConfigFileName, "config_repo: config-repo\nmanifest: ../outside\n")
+
+	_, err := LoadRootConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "stay within the repository") {
+		t.Fatalf("unexpected error %q", err)
+	}
+}
+
 func TestLoadCentralConfig(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "config/license.yaml", `type: string
@@ -239,6 +266,19 @@ func TestLoadCentralConfigRejectsReservedConfigName(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	if !strings.Contains(err.Error(), `"name" is reserved`) {
+		t.Fatalf("unexpected error %q", err)
+	}
+}
+
+func TestLoadCentralConfigRejectsReservedManifestConfigName(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "config/manifest.yaml", "type: string\n")
+
+	_, err := LoadCentralConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), `"manifest" is reserved`) {
 		t.Fatalf("unexpected error %q", err)
 	}
 }
@@ -785,6 +825,74 @@ config:
 	}
 	if cfg.Config["enabled"] != true {
 		t.Fatalf("Config[enabled] = %v, want true", cfg.Config["enabled"])
+	}
+}
+
+func TestLoadRepoConfigManifest(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RepoConfigFileName, `name: example-repo
+default_branch: main
+manifest: .repo-managedfiles
+config: {}
+`)
+
+	cfg, err := LoadRepoConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadRepoConfig returned error: %v", err)
+	}
+
+	if cfg.Manifest != ".repo-managedfiles" {
+		t.Fatalf("Manifest = %q, want %q", cfg.Manifest, ".repo-managedfiles")
+	}
+}
+
+func TestLoadRepoConfigRejectsManifestOutsideRepository(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, RepoConfigFileName, `name: example-repo
+default_branch: main
+manifest: ../outside
+config: {}
+`)
+
+	_, err := LoadRepoConfig(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "stay within the repository") {
+		t.Fatalf("unexpected error %q", err)
+	}
+}
+
+func TestResolveManifestPath(t *testing.T) {
+	tests := []struct {
+		name    string
+		rootCfg *RootConfig
+		repoCfg *RepoConfig
+		want    string
+	}{
+		{
+			name: "default",
+			want: ManagedFilesManifestName,
+		},
+		{
+			name:    "workspace override",
+			rootCfg: &RootConfig{Manifest: ".workspace-managedfiles"},
+			want:    ".workspace-managedfiles",
+		},
+		{
+			name:    "repo override",
+			rootCfg: &RootConfig{Manifest: ".workspace-managedfiles"},
+			repoCfg: &RepoConfig{Manifest: ".repo-managedfiles"},
+			want:    ".repo-managedfiles",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ResolveManifestPath(tt.rootCfg, tt.repoCfg); got != tt.want {
+				t.Fatalf("ResolveManifestPath() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 

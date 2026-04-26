@@ -48,6 +48,11 @@ func GenerateJSONSchema(centralCfg *config.CentralConfig) *JSONSchema {
 				Type:        "string",
 				Description: "The default branch of the repository.",
 			},
+			"manifest": {
+				Type:        "string",
+				Description: "Relative path for the generated managed files manifest.",
+				Default:     config.ManagedFilesManifestName,
+			},
 		},
 	}
 

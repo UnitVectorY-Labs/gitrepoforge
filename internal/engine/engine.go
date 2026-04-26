@@ -34,7 +34,7 @@ type TemplateData struct {
 }
 
 // ComputeFindings computes the compliance findings for a repo.
-func ComputeFindings(repoCfg *config.RepoConfig, centralCfg *config.CentralConfig, repoPath string) ([]Finding, error) {
+func ComputeFindings(repoCfg *config.RepoConfig, centralCfg *config.CentralConfig, repoPath, manifestPath string) ([]Finding, error) {
 	var findings []Finding
 
 	providedConfig := cloneConfigMap(repoCfg.Config)
@@ -57,11 +57,11 @@ func ComputeFindings(repoCfg *config.RepoConfig, centralCfg *config.CentralConfi
 		findings = append(findings, ruleFindings...)
 	}
 
-	manifestContent, err := renderManagedFilesManifest(data, centralCfg)
+	manifestContent, err := renderManagedFilesManifest(data, centralCfg, manifestPath)
 	if err != nil {
 		return nil, fmt.Errorf("error rendering managed files manifest: %w", err)
 	}
-	manifestFindings, err := evaluateWholeFileRule(config.FileRule{Path: config.ManagedFilesManifestName}, manifestContent, repoPath)
+	manifestFindings, err := evaluateWholeFileRule(config.FileRule{Path: manifestPath}, manifestContent, repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("error evaluating managed files manifest: %w", err)
 	}

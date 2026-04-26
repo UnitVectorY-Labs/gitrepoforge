@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "default_branch",
+    "name"
+  ],
+  "properties": {
+    "config": {
+      "type": "object",
+      "additionalProperties": false
+    },
+    "default_branch": {
+      "type": "string",
+      "description": "The default branch of the repository."
+    },
+    "manifest": {
+      "type": "string",
+      "description": "Relative path for the generated managed files manifest.",
+      "default": ".managedfiles"
+    },
+    "name": {
+      "type": "string",
+      "description": "Must match the repository folder name."
+    }
+  }
+}

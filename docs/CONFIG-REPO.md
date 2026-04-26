@@ -136,6 +136,7 @@ These names are reserved because they already exist as top-level fields in `.git
 
 - `name`
 - `default_branch`
+- `manifest`
 - `config`
 
 They cannot be declared under `config/` and must not appear inside the repo's `config:` map.
@@ -144,7 +145,7 @@ They cannot be declared under `config/` and must not appear inside the repo's `c
 
 Each output rule maps to one target file. The relative path under `outputs/`, without the `.gitrepoforge` suffix, becomes the managed file path in the repo.
 Every file under `outputs/` must end with `.gitrepoforge`; unexpected filenames are treated as config errors so typos are not silently ignored.
-gitrepoforge also derives a generated `.managedfiles.yaml` file for each managed repo that inventories the selected file-level and section-based outputs for that repo.
+gitrepoforge writes a generated managed-files manifest for each managed repo. By default the file is `.managedfiles`. A workspace or repo `manifest` setting can choose a different relative path, with the repo value taking precedence.
 
 **`outputs/LICENSE.gitrepoforge`**
 

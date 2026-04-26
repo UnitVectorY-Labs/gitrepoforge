@@ -32,7 +32,7 @@ type managedSectionHint struct {
 	End   string `yaml:"end"`
 }
 
-func renderManagedFilesManifest(data TemplateData, centralCfg *config.CentralConfig) (string, error) {
+func renderManagedFilesManifest(data TemplateData, centralCfg *config.CentralConfig, manifestPath string) (string, error) {
 	entries := make([]managedFileEntry, 0, len(centralCfg.Files)+1)
 	for _, rule := range centralCfg.Files {
 		entry, ok, err := describeManagedFile(rule, data)
@@ -45,7 +45,7 @@ func renderManagedFilesManifest(data TemplateData, centralCfg *config.CentralCon
 	}
 
 	entries = append(entries, managedFileEntry{
-		Path:       config.ManagedFilesManifestName,
+		Path:       manifestPath,
 		Management: managedFileTypeFile,
 	})
 
@@ -139,10 +139,10 @@ func renderBoundaryHint(boundary Boundary) string {
 	}
 }
 
-func stripManagedFilesManifest(findings []Finding) []Finding {
+func stripManagedFilesManifest(findings []Finding, manifestPath string) []Finding {
 	filtered := make([]Finding, 0, len(findings))
 	for _, finding := range findings {
-		if finding.FilePath == config.ManagedFilesManifestName {
+		if finding.FilePath == manifestPath {
 			continue
 		}
 		filtered = append(filtered, finding)
@@ -150,9 +150,9 @@ func stripManagedFilesManifest(findings []Finding) []Finding {
 	return filtered
 }
 
-func managedFilesManifestFinding(findings []Finding) *Finding {
+func managedFilesManifestFinding(findings []Finding, manifestPath string) *Finding {
 	for i := range findings {
-		if findings[i].FilePath == config.ManagedFilesManifestName {
+		if findings[i].FilePath == manifestPath {
 			return &findings[i]
 		}
 	}
