@@ -85,3 +85,10 @@ func TestFallbackDiffLinesPreservesAllLines(t *testing.T) {
 		t.Fatalf("ops[2] = %+v, want insert new-1", ops[2])
 	}
 }
+
+func TestSafeCombinedLengthRejectsOverflow(t *testing.T) {
+	const maxInt = int(^uint(0) >> 1)
+	if got := safeCombinedLength(maxInt, 1); got != 0 {
+		t.Fatalf("safeCombinedLength(maxInt, 1) = %d, want 0", got)
+	}
+}

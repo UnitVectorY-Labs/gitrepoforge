@@ -118,7 +118,7 @@ func safeDiffMatrixDimensions(oldLen, newLen int) (int, int, bool) {
 }
 
 func fallbackDiffLines(oldLines, newLines []string) []diffOp {
-	ops := make([]diffOp, 0, len(oldLines)+len(newLines))
+	ops := make([]diffOp, 0, safeCombinedLength(len(oldLines), len(newLines)))
 	for _, line := range oldLines {
 		ops = append(ops, diffOp{kind: "delete", line: line})
 	}
@@ -126,6 +126,15 @@ func fallbackDiffLines(oldLines, newLines []string) []diffOp {
 		ops = append(ops, diffOp{kind: "insert", line: line})
 	}
 	return ops
+}
+
+func safeCombinedLength(a, b int) int {
+	const maxInt = int(^uint(0) >> 1)
+
+	if a < 0 || b < 0 || a > maxInt-b {
+		return 0
+	}
+	return a + b
 }
 
 func splitLines(content string) []string {

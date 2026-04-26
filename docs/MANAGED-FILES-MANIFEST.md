@@ -54,7 +54,7 @@ managed_files:
 
 ## Inclusion Rules
 
-- Whole-file outputs are listed as `management: file`.
+- File-level outputs are listed as `management: file`.
 - Section-based outputs are listed as `management: sections` with their section boundary hints.
 - Files whose selected output is `absent: true` are not listed.
 - `mode: delete` outputs are not listed.
