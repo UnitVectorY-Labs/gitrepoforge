@@ -27,6 +27,7 @@ Several flags are shared across commands:
 | `--json` | `validate`, `apply`, `schema` | Output results as JSON instead of the default format. |
 | `--output <path>` | `report`, `schema` | Write output to a file instead of stdout. |
 | `--action <name>` | `apply` | Named action from the `action` config to use for Git automation. |
+| `--version`, `-v` | top-level | Print version as `gitrepoforge version vX.Y.Z (goX.Y.Z, os/arch)` where `os/arch` is the target platform (for example, `linux/amd64` or `darwin/arm64`). |
 
 ## Output
 

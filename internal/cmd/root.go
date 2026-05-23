@@ -3,6 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"regexp"
+	"runtime"
+	"strings"
 
 	"github.com/UnitVectorY-Labs/gitrepoforge/internal/output"
 )
@@ -18,7 +21,7 @@ func Execute(version string) {
 
 	switch subcmd {
 	case "--version", "-v":
-		fmt.Println("gitrepoforge " + version)
+		fmt.Println(formatVersionOutput(version))
 	case "validate":
 		runValidate(version, os.Args[2:])
 	case "apply":
@@ -35,6 +38,15 @@ func Execute(version string) {
 		printHelp()
 		os.Exit(1)
 	}
+}
+
+var semverRe = regexp.MustCompile(`^\d+\.\d+\.\d+`)
+
+func formatVersionOutput(version string) string {
+	if semverRe.MatchString(version) && !strings.HasPrefix(version, "v") {
+		version = "v" + version
+	}
+	return fmt.Sprintf("gitrepoforge version %s (%s, %s/%s)", version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 }
 
 func printHelp() {
