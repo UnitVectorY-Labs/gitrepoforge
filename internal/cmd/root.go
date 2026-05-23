@@ -36,10 +36,10 @@ func Execute(version string) {
 		printHelp()
 		os.Exit(1)
 	}
+}
 
-	func formatVersionOutput(version string) string {
-		return fmt.Sprintf("gitrepoforge version %s (%s, %s/%s)", version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
-	}
+func formatVersionOutput(version string) string {
+	return fmt.Sprintf("gitrepoforge version %s (%s, %s/%s)", version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 }
 
 func printHelp() {
