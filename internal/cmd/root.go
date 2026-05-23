@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/UnitVectorY-Labs/gitrepoforge/internal/output"
 )
@@ -18,7 +19,7 @@ func Execute(version string) {
 
 	switch subcmd {
 	case "--version", "-v":
-		fmt.Println("gitrepoforge " + version)
+		fmt.Println(formatVersionOutput(version))
 	case "validate":
 		runValidate(version, os.Args[2:])
 	case "apply":
@@ -34,6 +35,10 @@ func Execute(version string) {
 		fmt.Println()
 		printHelp()
 		os.Exit(1)
+	}
+
+	func formatVersionOutput(version string) string {
+		return fmt.Sprintf("gitrepoforge version %s (%s, %s/%s)", version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 	}
 }
 
