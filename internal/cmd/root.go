@@ -3,7 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"runtime"
+	"strings"
 
 	"github.com/UnitVectorY-Labs/gitrepoforge/internal/output"
 )
@@ -38,7 +40,12 @@ func Execute(version string) {
 	}
 }
 
+var semverRe = regexp.MustCompile(`^\d+\.\d+\.\d+`)
+
 func formatVersionOutput(version string) string {
+	if semverRe.MatchString(version) && !strings.HasPrefix(version, "v") {
+		version = "v" + version
+	}
 	return fmt.Sprintf("gitrepoforge version %s (%s, %s/%s)", version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 }
 
