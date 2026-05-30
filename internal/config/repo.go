@@ -24,10 +24,10 @@ var gitPlaceholderRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 
 // RepoConfig represents the per-repo config dotfile (.gitrepoforge).
 type RepoConfig struct {
-	Name          string                 `yaml:"name"`
-	DefaultBranch string                 `yaml:"default_branch"`
-	Manifest      string                 `yaml:"manifest"`
-	Config        map[string]interface{} `yaml:"config"`
+	Name          string         `yaml:"name"`
+	DefaultBranch string         `yaml:"default_branch"`
+	Manifest      string         `yaml:"manifest"`
+	Config        map[string]any `yaml:"config"`
 }
 
 func LoadRepoConfig(repoPath string) (*RepoConfig, error) {

@@ -309,8 +309,8 @@ func TestApplyConfigDefaultsNestedObject(t *testing.T) {
 	repoCfg := &RepoConfig{
 		Name:          "example-repo",
 		DefaultBranch: "main",
-		Config: map[string]interface{}{
-			"docs": map[string]interface{}{
+		Config: map[string]any{
+			"docs": map[string]any{
 				"domain": "foo.example.com",
 			},
 		},
@@ -330,7 +330,7 @@ func TestApplyConfigDefaultsNestedObject(t *testing.T) {
 
 	ApplyConfigDefaults(repoCfg, centralCfg)
 
-	docs, ok := repoCfg.Config["docs"].(map[string]interface{})
+	docs, ok := repoCfg.Config["docs"].(map[string]any)
 	if !ok {
 		t.Fatalf("Config[docs] has unexpected type %T", repoCfg.Config["docs"])
 	}
@@ -361,7 +361,7 @@ func TestResolvedConfigValuesMaterializesOptionalObjectWithNestedDefaults(t *tes
 
 	values := ResolvedConfigValues(repoCfg, centralCfg)
 
-	docs, ok := values["docs"].(map[string]interface{})
+	docs, ok := values["docs"].(map[string]any)
 	if !ok {
 		t.Fatalf("values[docs] has unexpected type %T", values["docs"])
 	}

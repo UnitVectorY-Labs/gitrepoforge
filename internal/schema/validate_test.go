@@ -21,7 +21,7 @@ func TestValidateRepoConfig(t *testing.T) {
 		repoCfg := &config.RepoConfig{
 			Name:          "example-repo",
 			DefaultBranch: "main",
-			Config: map[string]interface{}{
+			Config: map[string]any{
 				"license": "mit",
 				"enabled": true,
 			},
@@ -37,7 +37,7 @@ func TestValidateRepoConfig(t *testing.T) {
 		repoCfg := &config.RepoConfig{
 			Name:          "example-repo",
 			DefaultBranch: "main",
-			Config:        map[string]interface{}{},
+			Config:        map[string]any{},
 		}
 
 		errs := ValidateRepoConfig(repoCfg, centralCfg, filepath.Join(t.TempDir(), "example-repo"))
@@ -53,7 +53,7 @@ func TestValidateRepoConfig(t *testing.T) {
 		repoCfg := &config.RepoConfig{
 			Name:          "example-repo",
 			DefaultBranch: "main",
-			Config:        map[string]interface{}{},
+			Config:        map[string]any{},
 		}
 		cfgWithDefault := &config.CentralConfig{
 			Definitions: []config.ConfigDefinition{
@@ -78,7 +78,7 @@ func TestValidateRepoConfig(t *testing.T) {
 		repoCfg := &config.RepoConfig{
 			Name:          "example-repo",
 			DefaultBranch: "main",
-			Config: map[string]interface{}{
+			Config: map[string]any{
 				"license": "mit",
 				"other":   "x",
 			},
@@ -97,7 +97,7 @@ func TestValidateRepoConfig(t *testing.T) {
 		repoCfg := &config.RepoConfig{
 			Name:          "example-repo",
 			DefaultBranch: "main",
-			Config: map[string]interface{}{
+			Config: map[string]any{
 				"license": "mit",
 				"name":    "bad",
 			},
@@ -116,7 +116,7 @@ func TestValidateRepoConfig(t *testing.T) {
 		repoCfg := &config.RepoConfig{
 			Name:          "example-repo",
 			DefaultBranch: "main",
-			Config: map[string]interface{}{
+			Config: map[string]any{
 				"license":  "mit",
 				"manifest": ".managedfiles",
 			},
@@ -135,7 +135,7 @@ func TestValidateRepoConfig(t *testing.T) {
 		repoCfg := &config.RepoConfig{
 			Name:          "example-repo",
 			DefaultBranch: "main",
-			Config: map[string]interface{}{
+			Config: map[string]any{
 				"license": "gpl-3.0",
 			},
 		}
@@ -152,7 +152,7 @@ func TestValidateRepoConfig(t *testing.T) {
 	t.Run("missing default branch", func(t *testing.T) {
 		repoCfg := &config.RepoConfig{
 			Name: "example-repo",
-			Config: map[string]interface{}{
+			Config: map[string]any{
 				"license": "mit",
 			},
 		}
@@ -186,8 +186,8 @@ func TestValidateRepoConfigNestedObject(t *testing.T) {
 		repoCfg := &config.RepoConfig{
 			Name:          "example-repo",
 			DefaultBranch: "main",
-			Config: map[string]interface{}{
-				"docs": map[string]interface{}{
+			Config: map[string]any{
+				"docs": map[string]any{
 					"domain": "foo.example.com",
 				},
 			},
@@ -198,7 +198,7 @@ func TestValidateRepoConfigNestedObject(t *testing.T) {
 			t.Fatalf("expected no validation errors, got %v", errs)
 		}
 
-		docs := repoCfg.Config["docs"].(map[string]interface{})
+		docs := repoCfg.Config["docs"].(map[string]any)
 		if docs["enabled"] != true {
 			t.Fatalf("Config[docs][enabled] = %v, want true", docs["enabled"])
 		}
@@ -208,8 +208,8 @@ func TestValidateRepoConfigNestedObject(t *testing.T) {
 		repoCfg := &config.RepoConfig{
 			Name:          "example-repo",
 			DefaultBranch: "main",
-			Config: map[string]interface{}{
-				"docs": map[string]interface{}{},
+			Config: map[string]any{
+				"docs": map[string]any{},
 			},
 		}
 
@@ -226,8 +226,8 @@ func TestValidateRepoConfigNestedObject(t *testing.T) {
 		repoCfg := &config.RepoConfig{
 			Name:          "example-repo",
 			DefaultBranch: "main",
-			Config: map[string]interface{}{
-				"docs": map[string]interface{}{
+			Config: map[string]any{
+				"docs": map[string]any{
 					"domain": "foo.example.com",
 					"extra":  "nope",
 				},
@@ -247,7 +247,7 @@ func TestValidateRepoConfigNestedObject(t *testing.T) {
 		repoCfg := &config.RepoConfig{
 			Name:          "example-repo",
 			DefaultBranch: "main",
-			Config: map[string]interface{}{
+			Config: map[string]any{
 				"docs": true,
 			},
 		}
@@ -280,7 +280,7 @@ func TestValidateRepoConfigPattern(t *testing.T) {
 		repoCfg := &config.RepoConfig{
 			Name:          "example-repo",
 			DefaultBranch: "main",
-			Config: map[string]interface{}{
+			Config: map[string]any{
 				"version": "1.26.1",
 			},
 		}
@@ -295,7 +295,7 @@ func TestValidateRepoConfigPattern(t *testing.T) {
 		repoCfg := &config.RepoConfig{
 			Name:          "example-repo",
 			DefaultBranch: "main",
-			Config: map[string]interface{}{
+			Config: map[string]any{
 				"version": "not-a-version",
 			},
 		}

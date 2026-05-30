@@ -69,7 +69,7 @@ func TestComputeFindingsSelectsMatchingTemplate(t *testing.T) {
 	repoCfg := &config.RepoConfig{
 		Name:          "example-repo",
 		DefaultBranch: "main",
-		Config: map[string]interface{}{
+		Config: map[string]any{
 			"license": "mit",
 		},
 	}
@@ -108,7 +108,7 @@ func TestComputeFindingsReturnsErrorWhenNoTemplateMatches(t *testing.T) {
 	repoCfg := &config.RepoConfig{
 		Name:          "example-repo",
 		DefaultBranch: "main",
-		Config: map[string]interface{}{
+		Config: map[string]any{
 			"license": "apache-2.0",
 		},
 	}
@@ -197,7 +197,7 @@ build:
 	repoCfg := &config.RepoConfig{
 		Name:          "example-repo",
 		DefaultBranch: "main",
-		Config: map[string]interface{}{
+		Config: map[string]any{
 			"justfile": true,
 			"language": "go",
 		},
@@ -249,7 +249,7 @@ jobs:
 	repoCfg := &config.RepoConfig{
 		Name:          "example-repo",
 		DefaultBranch: "main",
-		Config: map[string]interface{}{
+		Config: map[string]any{
 			"codecov": true,
 		},
 	}
@@ -293,10 +293,10 @@ go-version: {{ .Config.versions.go | quote_double }}
 	repoCfg := &config.RepoConfig{
 		Name:          "example-repo",
 		DefaultBranch: "main",
-		Config: map[string]interface{}{
+		Config: map[string]any{
 			"description": "It's \"quoted\"\nand escaped",
 			"summary":     `It's "quoted"`,
-			"versions": map[string]interface{}{
+			"versions": map[string]any{
 				"go": "1.26.0",
 			},
 		},
@@ -338,7 +338,7 @@ func TestComputeFindingsQuoteHelperRejectsUnknownHelper(t *testing.T) {
 	repoCfg := &config.RepoConfig{
 		Name:          "example-repo",
 		DefaultBranch: "main",
-		Config: map[string]interface{}{
+		Config: map[string]any{
 			"description": "quoted",
 		},
 	}
@@ -400,7 +400,7 @@ func TestComputeFindingsMaterializesNestedDefaultsForOptionalObjects(t *testing.
 		t.Fatalf("Expected = %q, want %q", findings[0].Expected, "true")
 	}
 
-	docs, ok := repoCfg.Config["docs"].(map[string]interface{})
+	docs, ok := repoCfg.Config["docs"].(map[string]any)
 	if !ok {
 		t.Fatalf("Config[docs] has unexpected type %T", repoCfg.Config["docs"])
 	}
@@ -457,7 +457,7 @@ func TestComputeFindingsExistsConditionUsesExplicitConfig(t *testing.T) {
 			t.Fatalf("expected 0 findings, got %d", len(findings))
 		}
 
-		docs, ok := repoCfg.Config["docs"].(map[string]interface{})
+		docs, ok := repoCfg.Config["docs"].(map[string]any)
 		if !ok {
 			t.Fatalf("Config[docs] has unexpected type %T", repoCfg.Config["docs"])
 		}
@@ -470,8 +470,8 @@ func TestComputeFindingsExistsConditionUsesExplicitConfig(t *testing.T) {
 		repoCfg := &config.RepoConfig{
 			Name:          "example-repo",
 			DefaultBranch: "main",
-			Config: map[string]interface{}{
-				"docs": map[string]interface{}{
+			Config: map[string]any{
+				"docs": map[string]any{
 					"enabled": true,
 					"domain":  "docs.example.com",
 				},
@@ -495,8 +495,8 @@ func TestComputeFindingsExistsConditionUsesExplicitConfig(t *testing.T) {
 		repoCfg := &config.RepoConfig{
 			Name:          "example-repo",
 			DefaultBranch: "main",
-			Config: map[string]interface{}{
-				"docs": map[string]interface{}{
+			Config: map[string]any{
+				"docs": map[string]any{
 					"enabled": false,
 					"domain":  "docs.example.com",
 				},
@@ -541,7 +541,7 @@ func TestComputeFindingsDeletesFileWhenAbsentCandidateMatches(t *testing.T) {
 	repoCfg := &config.RepoConfig{
 		Name:          "example-repo",
 		DefaultBranch: "main",
-		Config: map[string]interface{}{
+		Config: map[string]any{
 			"justfile": false,
 		},
 	}
@@ -683,7 +683,7 @@ func TestComputeFindingsTreatsManagedFilesManifestAsCleanWhenCurrent(t *testing.
 	manifestContent, err := renderManagedFilesManifest(TemplateData{
 		Name:          repoCfg.Name,
 		DefaultBranch: repoCfg.DefaultBranch,
-		Config:        map[string]interface{}{},
+		Config:        map[string]any{},
 	}, centralCfg, config.ManagedFilesManifestName)
 	if err != nil {
 		t.Fatalf("renderManagedFilesManifest returned error: %v", err)
@@ -768,31 +768,31 @@ func TestEvaluateCondition(t *testing.T) {
 	tests := []struct {
 		name           string
 		condition      string
-		values         map[string]interface{}
-		providedValues map[string]interface{}
+		values         map[string]any
+		providedValues map[string]any
 		want           bool
 		wantErr        bool
 	}{
 		{name: "empty condition matches", condition: "", want: true},
-		{name: "boolean key true", condition: "enabled", values: map[string]interface{}{"enabled": true}, want: true},
-		{name: "boolean key false", condition: "!enabled", values: map[string]interface{}{"enabled": false}, want: true},
-		{name: "string equality", condition: `license == "mit"`, values: map[string]interface{}{"license": "mit"}, want: true},
-		{name: "string inequality", condition: `license != "apache-2.0"`, values: map[string]interface{}{"license": "mit"}, want: true},
-		{name: "nested boolean key", condition: "docs.enabled", values: map[string]interface{}{"docs": map[string]interface{}{"enabled": true}}, want: true},
-		{name: "nested string equality", condition: `docs.domain == "foo.example.com"`, values: map[string]interface{}{"docs": map[string]interface{}{"domain": "foo.example.com"}}, want: true},
-		{name: "exists key present", condition: "exists docs.domain", providedValues: map[string]interface{}{"docs": map[string]interface{}{"domain": "foo.example.com"}}, want: true},
-		{name: "exists key missing", condition: "exists docs.domain", providedValues: map[string]interface{}{}, want: false},
-		{name: "not exists key missing", condition: "!exists docs.domain", providedValues: map[string]interface{}{}, want: true},
-		{name: "exists ignores defaulted value", condition: "exists docs.domain", values: map[string]interface{}{"docs": map[string]interface{}{"domain": "default.example.com"}}, providedValues: map[string]interface{}{}, want: false},
-		{name: "and expression", condition: "docs.enabled && exists docs.domain", values: map[string]interface{}{"docs": map[string]interface{}{"enabled": true}}, providedValues: map[string]interface{}{"docs": map[string]interface{}{"domain": "foo.example.com"}}, want: true},
-		{name: "and expression false", condition: "docs.enabled && exists docs.domain", values: map[string]interface{}{"docs": map[string]interface{}{"enabled": false}}, providedValues: map[string]interface{}{"docs": map[string]interface{}{"domain": "foo.example.com"}}, want: false},
-		{name: "or expression", condition: "docs.enabled || exists docs.domain", values: map[string]interface{}{"docs": map[string]interface{}{"enabled": false}}, providedValues: map[string]interface{}{"docs": map[string]interface{}{"domain": "foo.example.com"}}, want: true},
-		{name: "operator precedence", condition: "enabled || other && exists docs.domain", values: map[string]interface{}{"enabled": false, "other": true}, providedValues: map[string]interface{}{"docs": map[string]interface{}{"domain": "foo.example.com"}}, want: true},
-		{name: "grouped expression", condition: "(enabled || other) && exists docs.domain", values: map[string]interface{}{"enabled": false, "other": true}, providedValues: map[string]interface{}{"docs": map[string]interface{}{"domain": "foo.example.com"}}, want: true},
-		{name: "missing key equality", condition: `license == "mit"`, values: map[string]interface{}{}, want: false},
-		{name: "bare non boolean is invalid", condition: "license", values: map[string]interface{}{"license": "mit"}, wantErr: true},
+		{name: "boolean key true", condition: "enabled", values: map[string]any{"enabled": true}, want: true},
+		{name: "boolean key false", condition: "!enabled", values: map[string]any{"enabled": false}, want: true},
+		{name: "string equality", condition: `license == "mit"`, values: map[string]any{"license": "mit"}, want: true},
+		{name: "string inequality", condition: `license != "apache-2.0"`, values: map[string]any{"license": "mit"}, want: true},
+		{name: "nested boolean key", condition: "docs.enabled", values: map[string]any{"docs": map[string]any{"enabled": true}}, want: true},
+		{name: "nested string equality", condition: `docs.domain == "foo.example.com"`, values: map[string]any{"docs": map[string]any{"domain": "foo.example.com"}}, want: true},
+		{name: "exists key present", condition: "exists docs.domain", providedValues: map[string]any{"docs": map[string]any{"domain": "foo.example.com"}}, want: true},
+		{name: "exists key missing", condition: "exists docs.domain", providedValues: map[string]any{}, want: false},
+		{name: "not exists key missing", condition: "!exists docs.domain", providedValues: map[string]any{}, want: true},
+		{name: "exists ignores defaulted value", condition: "exists docs.domain", values: map[string]any{"docs": map[string]any{"domain": "default.example.com"}}, providedValues: map[string]any{}, want: false},
+		{name: "and expression", condition: "docs.enabled && exists docs.domain", values: map[string]any{"docs": map[string]any{"enabled": true}}, providedValues: map[string]any{"docs": map[string]any{"domain": "foo.example.com"}}, want: true},
+		{name: "and expression false", condition: "docs.enabled && exists docs.domain", values: map[string]any{"docs": map[string]any{"enabled": false}}, providedValues: map[string]any{"docs": map[string]any{"domain": "foo.example.com"}}, want: false},
+		{name: "or expression", condition: "docs.enabled || exists docs.domain", values: map[string]any{"docs": map[string]any{"enabled": false}}, providedValues: map[string]any{"docs": map[string]any{"domain": "foo.example.com"}}, want: true},
+		{name: "operator precedence", condition: "enabled || other && exists docs.domain", values: map[string]any{"enabled": false, "other": true}, providedValues: map[string]any{"docs": map[string]any{"domain": "foo.example.com"}}, want: true},
+		{name: "grouped expression", condition: "(enabled || other) && exists docs.domain", values: map[string]any{"enabled": false, "other": true}, providedValues: map[string]any{"docs": map[string]any{"domain": "foo.example.com"}}, want: true},
+		{name: "missing key equality", condition: `license == "mit"`, values: map[string]any{}, want: false},
+		{name: "bare non boolean is invalid", condition: "license", values: map[string]any{"license": "mit"}, wantErr: true},
 		{name: "invalid exists condition", condition: "exists", wantErr: true},
-		{name: "missing closing parenthesis", condition: "(enabled && exists docs.domain", values: map[string]interface{}{"enabled": true}, providedValues: map[string]interface{}{"docs": map[string]interface{}{"domain": "foo.example.com"}}, wantErr: true},
+		{name: "missing closing parenthesis", condition: "(enabled && exists docs.domain", values: map[string]any{"enabled": true}, providedValues: map[string]any{"docs": map[string]any{"domain": "foo.example.com"}}, wantErr: true},
 	}
 
 	for _, tt := range tests {
