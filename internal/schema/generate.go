@@ -24,7 +24,7 @@ type SchemaNode struct {
 	Description          string                `json:"description,omitempty"`
 	Enum                 []string              `json:"enum,omitempty"`
 	Pattern              string                `json:"pattern,omitempty"`
-	Default              interface{}           `json:"default,omitempty"`
+	Default              any                   `json:"default,omitempty"`
 	AdditionalProperties *bool                 `json:"additionalProperties,omitempty"`
 	Required             []string              `json:"required,omitempty"`
 	Properties           map[string]SchemaNode `json:"properties,omitempty"`
@@ -182,16 +182,16 @@ func RenderSchemaYAML(schema *JSONSchema) (string, error) {
 // jsonToYAMLNode converts JSON bytes into a yaml.Node tree with sorted map keys
 // for deterministic output.
 func jsonToYAMLNode(data []byte) (*yaml.Node, error) {
-	var raw interface{}
+	var raw any
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, err
 	}
 	return valueToYAMLNode(raw), nil
 }
 
-func valueToYAMLNode(v interface{}) *yaml.Node {
+func valueToYAMLNode(v any) *yaml.Node {
 	switch val := v.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		node := &yaml.Node{
 			Kind: yaml.MappingNode,
 			Tag:  "!!map",
@@ -211,7 +211,7 @@ func valueToYAMLNode(v interface{}) *yaml.Node {
 			node.Content = append(node.Content, keyNode, valNode)
 		}
 		return node
-	case []interface{}:
+	case []any:
 		node := &yaml.Node{
 			Kind: yaml.SequenceNode,
 			Tag:  "!!seq",

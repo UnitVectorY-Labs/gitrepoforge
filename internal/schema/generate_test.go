@@ -232,7 +232,7 @@ func TestRenderSchemaJSONDeterministic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RenderSchemaJSON error: %v", err)
 	}
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		again, err := RenderSchemaJSON(schema)
 		if err != nil {
 			t.Fatalf("RenderSchemaJSON error on iteration %d: %v", i, err)
@@ -243,7 +243,7 @@ func TestRenderSchemaJSONDeterministic(t *testing.T) {
 	}
 
 	// Verify valid JSON
-	var parsed interface{}
+	var parsed any
 	if err := json.Unmarshal([]byte(first), &parsed); err != nil {
 		t.Fatalf("rendered JSON is not valid: %v", err)
 	}
@@ -269,7 +269,7 @@ func TestRenderSchemaYAMLDeterministic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RenderSchemaYAML error: %v", err)
 	}
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		again, err := RenderSchemaYAML(schema)
 		if err != nil {
 			t.Fatalf("RenderSchemaYAML error on iteration %d: %v", i, err)

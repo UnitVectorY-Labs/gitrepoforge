@@ -28,9 +28,9 @@ type Finding struct {
 type TemplateData struct {
 	Name           string
 	DefaultBranch  string
-	Config         map[string]interface{}
+	Config         map[string]any
 	captures       map[string]map[string]string
-	providedConfig map[string]interface{}
+	providedConfig map[string]any
 }
 
 // ComputeFindings computes the compliance findings for a repo.
@@ -283,16 +283,16 @@ func renderTemplateFile(path, templateMode string, data TemplateData) (string, e
 	preparedContent, placeholder := prepareTemplateContent(string(content), templateMode)
 
 	funcMap := template.FuncMap{
-		"getConfig": func(values map[string]interface{}, key string) interface{} {
+		"getConfig": func(values map[string]any, key string) any {
 			if values == nil {
 				return nil
 			}
 			return values[key]
 		},
-		"quote_double": func(value interface{}) string {
+		"quote_double": func(value any) string {
 			return quoteDoubleTemplateValue(value)
 		},
-		"quote_single": func(value interface{}) string {
+		"quote_single": func(value any) string {
 			return quoteSingleTemplateValue(value)
 		},
 		"capture": func(key, group string) (string, error) {
@@ -324,16 +324,16 @@ func renderTemplateContent(path, content, templateMode string, data TemplateData
 	preparedContent, placeholder := prepareTemplateContent(content, templateMode)
 
 	funcMap := template.FuncMap{
-		"getConfig": func(values map[string]interface{}, key string) interface{} {
+		"getConfig": func(values map[string]any, key string) any {
 			if values == nil {
 				return nil
 			}
 			return values[key]
 		},
-		"quote_double": func(value interface{}) string {
+		"quote_double": func(value any) string {
 			return quoteDoubleTemplateValue(value)
 		},
-		"quote_single": func(value interface{}) string {
+		"quote_single": func(value any) string {
 			return quoteSingleTemplateValue(value)
 		},
 		"capture": func(key, group string) (string, error) {
@@ -404,11 +404,11 @@ func escapeStrictModeDoubleBrackets(content, placeholder string) string {
 	}
 }
 
-func quoteDoubleTemplateValue(value interface{}) string {
+func quoteDoubleTemplateValue(value any) string {
 	return strconv.Quote(fmt.Sprint(value))
 }
 
-func quoteSingleTemplateValue(value interface{}) string {
+func quoteSingleTemplateValue(value any) string {
 	return "'" + strings.ReplaceAll(fmt.Sprint(value), "'", "''") + "'"
 }
 
@@ -423,7 +423,7 @@ func hasStrictTemplateBoundary(content string, index int) bool {
 
 // EvaluateCondition checks whether a template selector condition matches the
 // current repo config. Empty conditions always match.
-func EvaluateCondition(condition string, values, providedValues map[string]interface{}) (bool, error) {
+func EvaluateCondition(condition string, values, providedValues map[string]any) (bool, error) {
 	parser := conditionParser{
 		input:          strings.TrimSpace(condition),
 		values:         values,
@@ -447,8 +447,8 @@ func EvaluateCondition(condition string, values, providedValues map[string]inter
 type conditionParser struct {
 	input          string
 	pos            int
-	values         map[string]interface{}
-	providedValues map[string]interface{}
+	values         map[string]any
+	providedValues map[string]any
 }
 
 func (p *conditionParser) parseOr() (bool, error) {
@@ -584,7 +584,7 @@ func (p *conditionParser) done() bool {
 	return p.pos >= len(p.input)
 }
 
-func evaluateSimpleCondition(condition string, values, providedValues map[string]interface{}) (bool, error) {
+func evaluateSimpleCondition(condition string, values, providedValues map[string]any) (bool, error) {
 	if key, negate, ok, err := parseExistsCondition(condition); ok {
 		if err != nil {
 			return false, err
@@ -655,7 +655,7 @@ func parseExistsCondition(condition string) (key string, negate, ok bool, err er
 	return key, negate, true, nil
 }
 
-func evaluateBooleanKey(key string, values map[string]interface{}) (bool, error) {
+func evaluateBooleanKey(key string, values map[string]any) (bool, error) {
 	key = strings.TrimSpace(key)
 	if !isValidConditionKey(key) {
 		return false, fmt.Errorf("invalid boolean condition %q", key)
@@ -674,13 +674,13 @@ func evaluateBooleanKey(key string, values map[string]interface{}) (bool, error)
 	return boolean, nil
 }
 
-func lookupConfigValue(key string, values map[string]interface{}) (interface{}, bool) {
+func lookupConfigValue(key string, values map[string]any) (any, bool) {
 	if values == nil {
 		return nil, false
 	}
-	current := interface{}(values)
-	for _, part := range strings.Split(key, ".") {
-		nested, ok := current.(map[string]interface{})
+	current := any(values)
+	for part := range strings.SplitSeq(key, ".") {
+		nested, ok := current.(map[string]any)
 		if !ok {
 			return nil, false
 		}
@@ -709,28 +709,28 @@ func isValidConditionKey(key string) bool {
 	return conditionKeyPattern.MatchString(key)
 }
 
-func cloneConfigMap(values map[string]interface{}) map[string]interface{} {
+func cloneConfigMap(values map[string]any) map[string]any {
 	if values == nil {
 		return nil
 	}
 
-	cloned, ok := cloneConfigValue(values).(map[string]interface{})
+	cloned, ok := cloneConfigValue(values).(map[string]any)
 	if !ok {
 		return nil
 	}
 	return cloned
 }
 
-func cloneConfigValue(value interface{}) interface{} {
+func cloneConfigValue(value any) any {
 	switch typed := value.(type) {
-	case map[string]interface{}:
-		result := make(map[string]interface{}, len(typed))
+	case map[string]any:
+		result := make(map[string]any, len(typed))
 		for key, nestedValue := range typed {
 			result[key] = cloneConfigValue(nestedValue)
 		}
 		return result
-	case map[interface{}]interface{}:
-		result := make(map[string]interface{}, len(typed))
+	case map[any]any:
+		result := make(map[string]any, len(typed))
 		for key, nestedValue := range typed {
 			keyName, ok := key.(string)
 			if !ok {
@@ -739,8 +739,8 @@ func cloneConfigValue(value interface{}) interface{} {
 			result[keyName] = cloneConfigValue(nestedValue)
 		}
 		return result
-	case []interface{}:
-		result := make([]interface{}, len(typed))
+	case []any:
+		result := make([]any, len(typed))
 		for i := range typed {
 			result[i] = cloneConfigValue(typed[i])
 		}
@@ -752,7 +752,7 @@ func cloneConfigValue(value interface{}) interface{} {
 
 // computeCaptures extracts named capture groups from config values that have
 // patterns defined. The result maps dotted key paths to group-name/value pairs.
-func computeCaptures(values map[string]interface{}, definitions []config.ConfigDefinition) map[string]map[string]string {
+func computeCaptures(values map[string]any, definitions []config.ConfigDefinition) map[string]map[string]string {
 	captures := map[string]map[string]string{}
 	for _, def := range definitions {
 		if def.Type == "object" {

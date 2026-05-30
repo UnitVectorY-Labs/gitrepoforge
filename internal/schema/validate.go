@@ -3,6 +3,7 @@ package schema
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/UnitVectorY-Labs/gitrepoforge/internal/config"
@@ -47,7 +48,7 @@ func ValidateRepoConfig(repoCfg *config.RepoConfig, centralCfg *config.CentralCo
 	return errors
 }
 
-func validateConfigMap(field string, values map[string]interface{}, definitions []config.ConfigDefinition, topLevel bool) []ValidationError {
+func validateConfigMap(field string, values map[string]any, definitions []config.ConfigDefinition, topLevel bool) []ValidationError {
 	var errors []ValidationError
 
 	allowedConfig := make(map[string]*config.ConfigDefinition, len(definitions))
@@ -105,7 +106,7 @@ func validateConfigMap(field string, values map[string]interface{}, definitions 
 	return errors
 }
 
-func validateConfigValue(field string, val interface{}, def *config.ConfigDefinition) []ValidationError {
+func validateConfigValue(field string, val any, def *config.ConfigDefinition) []ValidationError {
 	var errors []ValidationError
 
 	switch def.Type {
@@ -116,13 +117,7 @@ func validateConfigValue(field string, val interface{}, def *config.ConfigDefini
 			return errors
 		}
 		if len(def.Enum) > 0 {
-			found := false
-			for _, e := range def.Enum {
-				if e == strVal {
-					found = true
-					break
-				}
-			}
+			found := slices.Contains(def.Enum, strVal)
 			if !found {
 				errors = append(errors, ValidationError{
 					Field:   field,
@@ -148,7 +143,7 @@ func validateConfigValue(field string, val interface{}, def *config.ConfigDefini
 			errors = append(errors, ValidationError{Field: field, Message: "expected number value"})
 		}
 	case "list":
-		if _, ok := val.([]interface{}); !ok {
+		if _, ok := val.([]any); !ok {
 			errors = append(errors, ValidationError{Field: field, Message: "expected list value"})
 		}
 	case "object":

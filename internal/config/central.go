@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -27,7 +28,7 @@ type ConfigDefinition struct {
 	Type            string             `yaml:"type"`
 	Required        bool               `yaml:"required"`
 	Enum            []string           `yaml:"enum"`
-	Default         interface{}        `yaml:"default"`
+	Default         any                `yaml:"default"`
 	HasDefault      bool               `yaml:"-"`
 	Description     string             `yaml:"description"`
 	Pattern         string             `yaml:"pattern"`
@@ -375,16 +376,16 @@ func IsReservedConfigName(name string) bool {
 
 func ApplyConfigDefaults(repoCfg *RepoConfig, centralCfg *CentralConfig) {
 	if repoCfg.Config == nil {
-		repoCfg.Config = map[string]interface{}{}
+		repoCfg.Config = map[string]any{}
 	}
 
 	applyConfigDefaults(repoCfg.Config, centralCfg.Definitions, false)
 }
 
-func ResolvedConfigValues(repoCfg *RepoConfig, centralCfg *CentralConfig) map[string]interface{} {
-	values := map[string]interface{}{}
+func ResolvedConfigValues(repoCfg *RepoConfig, centralCfg *CentralConfig) map[string]any {
+	values := map[string]any{}
 	if repoCfg != nil && repoCfg.Config != nil {
-		cloned, ok := cloneDefaultValue(repoCfg.Config).(map[string]interface{})
+		cloned, ok := cloneDefaultValue(repoCfg.Config).(map[string]any)
 		if ok {
 			values = cloned
 		}
@@ -397,7 +398,7 @@ func ResolvedConfigValues(repoCfg *RepoConfig, centralCfg *CentralConfig) map[st
 	return values
 }
 
-func applyConfigDefaults(values map[string]interface{}, definitions []ConfigDefinition, materializeObjects bool) {
+func applyConfigDefaults(values map[string]any, definitions []ConfigDefinition, materializeObjects bool) {
 	for _, def := range definitions {
 		current, exists := values[def.Name]
 		if !exists {
@@ -420,7 +421,7 @@ func applyConfigDefaults(values map[string]interface{}, definitions []ConfigDefi
 	}
 }
 
-func missingConfigValue(def ConfigDefinition, materializeObjects bool) (interface{}, bool) {
+func missingConfigValue(def ConfigDefinition, materializeObjects bool) (any, bool) {
 	if def.HasDefault {
 		return cloneDefaultValue(def.Default), true
 	}
@@ -428,7 +429,7 @@ func missingConfigValue(def ConfigDefinition, materializeObjects bool) (interfac
 		return nil, false
 	}
 
-	attributes := map[string]interface{}{}
+	attributes := map[string]any{}
 	applyConfigDefaults(attributes, def.Attributes, true)
 	if len(attributes) == 0 {
 		return nil, false
@@ -436,16 +437,16 @@ func missingConfigValue(def ConfigDefinition, materializeObjects bool) (interfac
 	return attributes, true
 }
 
-func cloneDefaultValue(value interface{}) interface{} {
+func cloneDefaultValue(value any) any {
 	switch typed := value.(type) {
-	case map[string]interface{}:
-		result := make(map[string]interface{}, len(typed))
+	case map[string]any:
+		result := make(map[string]any, len(typed))
 		for key, nestedValue := range typed {
 			result[key] = cloneDefaultValue(nestedValue)
 		}
 		return result
-	case map[interface{}]interface{}:
-		result := make(map[string]interface{}, len(typed))
+	case map[any]any:
+		result := make(map[string]any, len(typed))
 		for key, nestedValue := range typed {
 			keyName, ok := key.(string)
 			if !ok {
@@ -454,8 +455,8 @@ func cloneDefaultValue(value interface{}) interface{} {
 			result[keyName] = cloneDefaultValue(nestedValue)
 		}
 		return result
-	case []interface{}:
-		result := make([]interface{}, len(typed))
+	case []any:
+		result := make([]any, len(typed))
 		for i := range typed {
 			result[i] = cloneDefaultValue(typed[i])
 		}
@@ -465,12 +466,12 @@ func cloneDefaultValue(value interface{}) interface{} {
 	}
 }
 
-func AsConfigMap(value interface{}) (map[string]interface{}, bool) {
+func AsConfigMap(value any) (map[string]any, bool) {
 	switch typed := value.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		return typed, true
-	case map[interface{}]interface{}:
-		result := make(map[string]interface{}, len(typed))
+	case map[any]any:
+		result := make(map[string]any, len(typed))
 		for key, nestedValue := range typed {
 			keyName, ok := key.(string)
 			if !ok {
@@ -492,13 +493,7 @@ func validateDefaultValue(def ConfigDefinition) error {
 			return fmt.Errorf("default must be a string")
 		}
 		if len(def.Enum) > 0 {
-			found := false
-			for _, allowed := range def.Enum {
-				if allowed == value {
-					found = true
-					break
-				}
-			}
+			found := slices.Contains(def.Enum, value)
 			if !found {
 				return fmt.Errorf("default %q is not one of: %s", value, strings.Join(def.Enum, ", "))
 			}
@@ -518,7 +513,7 @@ func validateDefaultValue(def ConfigDefinition) error {
 			return fmt.Errorf("default must be a number")
 		}
 	case "list":
-		if _, ok := def.Default.([]interface{}); !ok {
+		if _, ok := def.Default.([]any); !ok {
 			return fmt.Errorf("default must be a list")
 		}
 	case "object":
