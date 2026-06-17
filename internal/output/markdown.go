@@ -169,39 +169,6 @@ func extractChangeLines(diff string) string {
 	return strings.Join(changes, "\n")
 }
 
-// renderPlainDiff produces a plain-text unified diff (no ANSI colors) for a finding.
-func renderPlainDiff(f FindingOutput) string {
-	if f.Operation != "create" && f.Operation != "update" && f.Operation != "delete" {
-		return ""
-	}
-
-	oldLabel := fmt.Sprintf("a/%s", f.FilePath)
-	newLabel := fmt.Sprintf("b/%s", f.FilePath)
-	if f.Operation == "create" {
-		oldLabel = "/dev/null"
-	}
-	if f.Operation == "delete" {
-		newLabel = "/dev/null"
-	}
-
-	var lines []string
-	lines = append(lines, fmt.Sprintf("--- %s", oldLabel))
-	lines = append(lines, fmt.Sprintf("+++ %s", newLabel))
-
-	for _, op := range diffLines(f.Actual, f.Expected) {
-		switch op.kind {
-		case "equal":
-			lines = append(lines, " "+op.line)
-		case "delete":
-			lines = append(lines, "-"+op.line)
-		case "insert":
-			lines = append(lines, "+"+op.line)
-		}
-	}
-
-	return strings.Join(lines, "\n")
-}
-
 func writeRepoSummaryTable(sb *strings.Builder, repoFindings map[string][]FindingOutput) {
 	sb.WriteString("## Repository Summary\n\n")
 	sb.WriteString("| Repository | Changes |\n")
