@@ -1,6 +1,7 @@
 name: gitrepoforge
 default_branch: main
 config:
+  osv: sarif
   description: "Command line application to audit and apply standard file patterns to Git repos."
   license: MIT
   language: go
