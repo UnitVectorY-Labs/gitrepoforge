@@ -1,7 +1,7 @@
 package schema
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"strings"
 	"testing"
 
@@ -282,5 +282,42 @@ func TestRenderSchemaYAMLDeterministic(t *testing.T) {
 	// Verify it ends with newline
 	if !strings.HasSuffix(first, "\n") {
 		t.Fatal("YAML output should end with newline")
+	}
+}
+
+func TestJSONV2SchemaDefaultsAndStrictParsing(t *testing.T) {
+	s := &JSONSchema{Type: "object", Properties: map[string]SchemaNode{
+		"false": {Type: "boolean", Default: false},
+		"empty": {Type: "string", Default: ""},
+		"none":  {Type: "string"},
+	}}
+	first, err := RenderSchemaJSON(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 20; i++ {
+		got, err := RenderSchemaJSON(s)
+		if err != nil || got != first {
+			t.Fatalf("schema is not deterministic: %v", err)
+		}
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal([]byte(first), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	props := decoded["properties"].(map[string]any)
+	for key, want := range map[string]any{"false": false, "empty": ""} {
+		got, ok := props[key].(map[string]any)["default"]
+		if !ok || got != want {
+			t.Errorf("%s default = %v, present %v", key, got, ok)
+		}
+	}
+	if _, ok := props["none"].(map[string]any)["default"]; ok {
+		t.Error("unexpected default")
+	}
+	for _, input := range [][]byte{[]byte(`{"x":1,"x":2}`), {'"', 0xff, '"'}} {
+		if _, err := jsonToYAMLNode(input); err == nil {
+			t.Errorf("accepted invalid JSON %q", input)
+		}
 	}
 }
