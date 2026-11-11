@@ -1,7 +1,8 @@
 package output
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"time"
 )
@@ -57,7 +58,7 @@ func NewReport(version, command, rootConfigPath, configRepoPath string) *Report 
 
 // PrintJSON outputs the report as JSON.
 func (r *Report) PrintJSON() error {
-	data, err := json.MarshalIndent(r, "", "  ")
+	data, err := json.Marshal(r, jsontext.WithIndent("  "), jsontext.EscapeForHTML(true))
 	if err != nil {
 		return err
 	}
