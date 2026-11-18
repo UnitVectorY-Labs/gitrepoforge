@@ -37,7 +37,7 @@ Several flags are shared across commands:
 
 ### JSON (`--json`)
 
-`validate` and `apply` return a structured report when `--json` is passed:
+`validate` and `apply` return a structured report when `--json` is passed. The `repos` field is an empty array when no repositories are reported:
 
 ```json
 {
