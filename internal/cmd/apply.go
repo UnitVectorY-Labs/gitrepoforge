@@ -21,7 +21,15 @@ func runApply(version string, args []string) {
 	repoFlag := fs.String("repo", "", "Target a single repo by folder name")
 	jsonFlag := fs.Bool("json", false, "Output in JSON format")
 	actionFlag := fs.String("action", "", "Named action from the action config to use for git automation")
+	branchFlag := fs.String("branch", "", "Override the branch name configured by the selected action")
+	fileFlags, excludeFileFlags := registerFileFilterFlags(fs)
 	fs.Parse(args)
+
+	fileFilter, err := buildFileFilter(fileFlags, excludeFileFlags)
+	if err != nil {
+		output.Error(fmt.Sprintf("filter error: %v", err))
+		os.Exit(1)
+	}
 
 	workspaceDir, err := os.Getwd()
 	if err != nil {
@@ -50,6 +58,10 @@ func runApply(version string, args []string) {
 		output.Error(fmt.Sprintf("action error: %v", err))
 		os.Exit(1)
 	}
+	if err := applyBranchOverride(gitCfg, actionName, *branchFlag, flagPassed(fs, "branch")); err != nil {
+		output.Error(fmt.Sprintf("branch error: %v", err))
+		os.Exit(1)
+	}
 
 	var repos []string
 	if *repoFlag != "" {
@@ -74,7 +86,7 @@ func runApply(version string, args []string) {
 
 	for _, repoPath := range repos {
 		repoName := filepath.Base(repoPath)
-		result := applyRepo(repoPath, repoName, rootCfg, gitCfg, actionName, centralCfg)
+		result := applyRepo(repoPath, repoName, rootCfg, gitCfg, actionName, centralCfg, fileFilter)
 		report.Repos = append(report.Repos, result)
 	}
 
@@ -89,7 +101,7 @@ func runApply(version string, args []string) {
 	}
 }
 
-func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, gitCfg *config.GitConfig, actionName string, centralCfg *config.CentralConfig) output.RepoResult {
+func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, gitCfg *config.GitConfig, actionName string, centralCfg *config.CentralConfig, fileFilter engine.FileFilter) output.RepoResult {
 	if !config.RepoConfigExists(repoPath) {
 		return output.RepoResult{
 			Name:   repoName,
@@ -127,7 +139,7 @@ func applyRepo(repoPath, repoName string, rootCfg *config.RootConfig, gitCfg *co
 		}
 	}
 
-	findings, err := engine.ComputeFindings(repoCfg, centralCfg, repoPath, config.ResolveManifestPath(rootCfg, repoCfg))
+	findings, err := engine.ComputeFindingsWithFilter(repoCfg, centralCfg, repoPath, config.ResolveManifestPath(rootCfg, repoCfg), fileFilter)
 	if err != nil {
 		return output.RepoResult{
 			Name:             repoName,
@@ -243,7 +255,11 @@ func applyFindingsWithGit(repoPath, repoName string, repoCfg *config.RepoConfig,
 	}
 
 	if gitCfg.Commit {
-		if err := gitops.AddAll(repoPath); err != nil {
+		findingPaths := make([]string, 0, len(findings))
+		for _, f := range findings {
+			findingPaths = append(findingPaths, f.FilePath)
+		}
+		if err := gitops.AddPaths(repoPath, findingPaths); err != nil {
 			restoreOriginalBranch()
 			return output.RepoResult{
 				Name:             repoName,
@@ -395,6 +411,24 @@ func resolveApplyAction(rootCfg *config.RootConfig, actionName string, actionSpe
 		return nil, "", fmt.Errorf("%v%s", err, configuredActionSuffix(rootCfg))
 	}
 	return gitCfg, actionName, nil
+}
+
+func applyBranchOverride(gitCfg *config.GitConfig, actionName, branchOverride string, branchSpecified bool) error {
+	if !branchSpecified {
+		return nil
+	}
+	if actionName == "" {
+		return fmt.Errorf("--branch requires --action")
+	}
+	trimmed := strings.TrimSpace(branchOverride)
+	if trimmed == "" {
+		return fmt.Errorf("--branch must not be empty")
+	}
+	if !gitCfg.CreateBranch {
+		return fmt.Errorf("--branch requires action %q to have create_branch enabled", actionName)
+	}
+	gitCfg.BranchName = trimmed
+	return nil
 }
 
 func configuredActionSuffix(rootCfg *config.RootConfig) string {

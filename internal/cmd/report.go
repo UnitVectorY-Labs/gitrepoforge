@@ -17,7 +17,14 @@ func runReport(version string, args []string) {
 	fs := flag.NewFlagSet("report", flag.ExitOnError)
 	repoFlag := fs.String("repo", "", "Target a single repo by folder name")
 	outputFlag := fs.String("output", "", "Write report to a file instead of stdout")
+	fileFlags, excludeFileFlags := registerFileFilterFlags(fs)
 	fs.Parse(args)
+
+	fileFilter, err := buildFileFilter(fileFlags, excludeFileFlags)
+	if err != nil {
+		output.Error(fmt.Sprintf("filter error: %v", err))
+		os.Exit(1)
+	}
 
 	workspaceDir, err := os.Getwd()
 	if err != nil {
@@ -76,7 +83,7 @@ func runReport(version string, args []string) {
 			continue
 		}
 
-		findings, err := engine.ComputeFindings(repoCfg, centralCfg, repoPath, config.ResolveManifestPath(rootCfg, repoCfg))
+		findings, err := engine.ComputeFindingsWithFilter(repoCfg, centralCfg, repoPath, config.ResolveManifestPath(rootCfg, repoCfg), fileFilter)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "  warning: %s: %v\n", repoName, err)
 			continue

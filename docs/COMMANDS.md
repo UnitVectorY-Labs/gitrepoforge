@@ -24,9 +24,12 @@ Several flags are shared across commands:
 | Flag | Used by | Description |
 |------|---------|-------------|
 | `--repo <name>` | `validate`, `apply`, `report` | Target a single repo by its directory name. |
+| `--file <pattern>` | `validate`, `apply`, `report` | Include only managed files matching the glob pattern (supports `*`, `?`, `[...]`, and `**`). Repeatable. |
+| `--exclude-file <pattern>` | `validate`, `apply`, `report` | Exclude managed files matching the glob pattern. Exclusions take precedence over `--file`. Repeatable. |
 | `--json` | `validate`, `apply`, `schema` | Output results as JSON instead of the default format. |
 | `--output <path>` | `report`, `schema` | Write output to a file instead of stdout. |
 | `--action <name>` | `apply` | Named action from the `action` config to use for Git automation. |
+| `--branch <name>` | `apply` | Override the branch name configured on the selected `--action` (requires `--action` with `create_branch: true`). |
 | `--version`, `-v` | top-level | Print version as `gitrepoforge version vX.Y.Z (goX.Y.Z, os/arch)` where `os/arch` is the target platform (for example, `linux/amd64` or `darwin/arm64`). |
 
 ## Output

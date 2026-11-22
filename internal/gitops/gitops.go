@@ -58,6 +58,38 @@ func AddAll(repoPath string) error {
 	return nil
 }
 
+// AddPaths stages additions, modifications, and deletions for only the
+// specified repository-relative paths.
+func AddPaths(repoPath string, paths []string) error {
+	if len(paths) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(paths))
+	args := make([]string, 0, len(paths)+3)
+	args = append(args, "add", "-A", "--")
+	for _, p := range paths {
+		if p == "" {
+			continue
+		}
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		args = append(args, p)
+	}
+	if len(args) == 3 {
+		return nil
+	}
+
+	cmd := exec.Command("git", args...)
+	cmd.Dir = repoPath
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git add failed: %s: %w", string(out), err)
+	}
+	return nil
+}
+
 // Commit creates a commit with the given message.
 func Commit(repoPath, message string) error {
 	cmd := exec.Command("git", "commit", "-m", message)

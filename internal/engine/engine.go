@@ -35,6 +35,12 @@ type TemplateData struct {
 
 // ComputeFindings computes the compliance findings for a repo.
 func ComputeFindings(repoCfg *config.RepoConfig, centralCfg *config.CentralConfig, repoPath, manifestPath string) ([]Finding, error) {
+	return ComputeFindingsWithFilter(repoCfg, centralCfg, repoPath, manifestPath, FileFilter{})
+}
+
+// ComputeFindingsWithFilter computes compliance findings for a repo, limiting
+// evaluated rules and the generated manifest according to filter.
+func ComputeFindingsWithFilter(repoCfg *config.RepoConfig, centralCfg *config.CentralConfig, repoPath, manifestPath string, filter FileFilter) ([]Finding, error) {
 	var findings []Finding
 
 	providedConfig := cloneConfigMap(repoCfg.Config)
@@ -50,6 +56,9 @@ func ComputeFindings(repoCfg *config.RepoConfig, centralCfg *config.CentralConfi
 	}
 
 	for _, rule := range centralCfg.Files {
+		if !filter.Matches(rule.Path) {
+			continue
+		}
 		ruleFindings, err := evaluateFileRule(rule, data, repoPath)
 		if err != nil {
 			return nil, fmt.Errorf("error evaluating rule for %s: %w", rule.Path, err)
@@ -57,15 +66,17 @@ func ComputeFindings(repoCfg *config.RepoConfig, centralCfg *config.CentralConfi
 		findings = append(findings, ruleFindings...)
 	}
 
-	manifestContent, err := renderManagedFilesManifest(data, centralCfg, manifestPath)
-	if err != nil {
-		return nil, fmt.Errorf("error rendering managed files manifest: %w", err)
+	if filter.MatchesManifest(manifestPath) {
+		manifestContent, err := renderManagedFilesManifest(data, centralCfg, manifestPath)
+		if err != nil {
+			return nil, fmt.Errorf("error rendering managed files manifest: %w", err)
+		}
+		manifestFindings, err := evaluateWholeFileRule(config.FileRule{Path: manifestPath}, manifestContent, repoPath)
+		if err != nil {
+			return nil, fmt.Errorf("error evaluating managed files manifest: %w", err)
+		}
+		findings = append(findings, manifestFindings...)
 	}
-	manifestFindings, err := evaluateWholeFileRule(config.FileRule{Path: manifestPath}, manifestContent, repoPath)
-	if err != nil {
-		return nil, fmt.Errorf("error evaluating managed files manifest: %w", err)
-	}
-	findings = append(findings, manifestFindings...)
 
 	return findings, nil
 }
