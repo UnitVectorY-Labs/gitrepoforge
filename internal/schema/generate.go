@@ -1,7 +1,8 @@
 package schema
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"sort"
 
@@ -24,7 +25,7 @@ type SchemaNode struct {
 	Description          string                `json:"description,omitempty"`
 	Enum                 []string              `json:"enum,omitempty"`
 	Pattern              string                `json:"pattern,omitempty"`
-	Default              any                   `json:"default,omitempty"`
+	Default              any                   `json:"default,omitzero"`
 	AdditionalProperties *bool                 `json:"additionalProperties,omitempty"`
 	Required             []string              `json:"required,omitempty"`
 	Properties           map[string]SchemaNode `json:"properties,omitempty"`
@@ -151,7 +152,7 @@ func hasRequiredDefinitions(definitions []config.ConfigDefinition) bool {
 
 // RenderSchemaJSON renders the JSON Schema as deterministic JSON with indentation.
 func RenderSchemaJSON(schema *JSONSchema) (string, error) {
-	data, err := json.MarshalIndent(schema, "", "  ")
+	data, err := json.Marshal(schema, jsontext.WithIndent("  "), jsontext.EscapeForHTML(true), json.Deterministic(true))
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal JSON schema: %w", err)
 	}
@@ -161,7 +162,7 @@ func RenderSchemaJSON(schema *JSONSchema) (string, error) {
 // RenderSchemaYAML renders the JSON Schema as deterministic YAML.
 func RenderSchemaYAML(schema *JSONSchema) (string, error) {
 	// Round-trip through JSON to get a deterministic ordered map structure
-	jsonData, err := json.Marshal(schema)
+	jsonData, err := json.Marshal(schema, json.Deterministic(true))
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal schema to JSON: %w", err)
 	}
