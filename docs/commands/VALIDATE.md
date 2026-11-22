@@ -19,6 +19,8 @@ gitrepoforge validate [flags]
 | Flag | Required | Description |
 |------|----------|-------------|
 | `--repo <name>` | no | Target a single repo by its directory name. |
+| `--file <pattern>` | no | Include only managed files matching the glob pattern (supports `*`, `?`, `[...]`, and `**`). Repeatable. |
+| `--exclude-file <pattern>` | no | Exclude managed files matching the glob pattern. Exclusions take precedence over `--file`. Repeatable. |
 | `--json` | no | Output results as JSON instead of human-readable text. |
 | `--verbose` | no | In human-readable mode, print git-style unified diffs for each finding. |
 
@@ -29,7 +31,7 @@ gitrepoforge validate [flags]
 3. For each repo:
    - If no `.gitrepoforge` file exists, the repo is **skipped**.
    - Validates the per-repo config, including `default_branch` and any configured `manifest` path, against the shared config schema.
-   - Selects template files, renders them, and compares them to the current file state, including the managed-files manifest at its resolved path.
+   - Selects template files, renders them, and compares them to the current file state. When `--file` or `--exclude-file` is set, only matching managed files are evaluated, and the managed-files manifest is skipped unless explicitly matched by `--file` (and not excluded).
 4. Reports each repo's status.
 
 When `--verbose` is set, drift findings also include per-file git-style unified diffs. Diff output includes hunk headers with old and new line ranges and uses the standard three lines of surrounding context where available. Removed lines are red and added lines are green unless the `NO_COLOR` environment variable is set.

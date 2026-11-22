@@ -19,13 +19,15 @@ gitrepoforge report [flags]
 | Flag | Required | Description |
 |------|----------|-------------|
 | `--repo <name>` | no | Target a single repo by its directory name. |
+| `--file <pattern>` | no | Include only managed files matching the glob pattern (supports `*`, `?`, `[...]`, and `**`). Repeatable. |
+| `--exclude-file <pattern>` | no | Exclude managed files matching the glob pattern. Exclusions take precedence over `--file`. Repeatable. |
 | `--output <path>` | no | Write the markdown report to a file instead of stdout. |
 
 ## Behavior
 
 1. Loads the root config (`.gitrepoforge-config`) and config repo.
 2. Discovers Git repos in the workspace (or targets the single `--repo`).
-3. For each repo with a valid `.gitrepoforge` config, computes the findings that `apply` would produce.
+3. For each repo with a valid `.gitrepoforge` config, computes the findings that `apply` would produce (respecting `--file` and `--exclude-file` when provided, skipping the managed-files manifest during filtered runs unless explicitly matched by `--file`).
 4. Aggregates findings by output file path across all repos.
 5. Deduplicates diffs so that repos receiving the same change share a single diff block.
 6. Outputs a markdown report to stdout or to the file specified by `--output`.

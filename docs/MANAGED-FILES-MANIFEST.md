@@ -18,6 +18,8 @@ The `manifest` field in `.gitrepoforge-config` sets the workspace default path. 
 
 The manifest is derived from the selected output rules and templates for that repository. It is not configuration, cannot be turned off, and any manual edits are overwritten the next time gitrepoforge applies changes.
 
+When running with file filters (`--file` or `--exclude-file`), gitrepoforge skips evaluating and updating the manifest unless `--file` explicitly matches the manifest path (and `--exclude-file` does not exclude it). This keeps targeted changes and pull requests focused on the selected subset of files.
+
 ## Purpose
 
 The manifest gives repository contributors a quick answer to:

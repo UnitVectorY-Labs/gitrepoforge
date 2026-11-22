@@ -17,16 +17,16 @@ If no `--action` flag is provided, `apply` does not write files and does not run
 If `create_branch` is `true`, gitrepoforge:
 
 - Reads the repository's current branch
-- Expands `branch_name` using the target repo's placeholder values
+- Expands `branch_name` (or the `--branch` CLI override, if provided) using the target repo's placeholder values
 - Runs `git checkout -b {branch}`
 
-Branch creation happens from the current branch, not from `default_branch`.
+Branch creation happens from the current branch, not from `default_branch`. Passing `--branch <name>` on `apply` lets you override the action's configured `branch_name` at runtime (for example, to use a shared branch name across multiple repositories for a targeted bulk PR).
 
 ## Commits
 
 If `commit` is `true`, gitrepoforge stages and commits the modified files:
 
-1. **Stage** all changes: `git add -A`
+1. **Stage** only the applied finding paths: `git add -A -- {paths...}`
 2. **Check** for staged changes: `git diff --cached --quiet`
 3. If changes exist, **commit** with the expanded `commit_message`
 

@@ -80,7 +80,7 @@ Each action supports the following fields:
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `create_branch` | boolean | No | Create a new branch before making changes. |
-| `branch_name` | string | Yes* | Name for the new branch. Supports {% raw %}`{{param}}`{% endraw %} placeholders. *Required if `create_branch` is true. |
+| `branch_name` | string | Yes* | Name for the new branch. Supports {% raw %}`{{param}}`{% endraw %} placeholders. *Required if `create_branch` is true. Can be overridden at runtime with `apply --branch <name>`. |
 | `commit` | boolean | No | Commit the changes after modification. |
 | `commit_message` | string | Yes* | Commit message. Supports {% raw %}`{{param}}`{% endraw %} placeholders. *Required if `commit` is true. |
 | `on_default_branch` | boolean | No | When `true`, fail the action unless the repo is currently on the branch named by `.gitrepoforge` `default_branch`. Defaults to `false`. |

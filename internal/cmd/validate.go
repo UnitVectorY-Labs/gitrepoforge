@@ -18,7 +18,14 @@ func runValidate(version string, args []string) {
 	repoFlag := fs.String("repo", "", "Target a single repo by folder name")
 	jsonFlag := fs.Bool("json", false, "Output in JSON format")
 	verboseFlag := fs.Bool("verbose", false, "Print colorized line diffs for drift findings")
+	fileFlags, excludeFileFlags := registerFileFilterFlags(fs)
 	fs.Parse(args)
+
+	fileFilter, err := buildFileFilter(fileFlags, excludeFileFlags)
+	if err != nil {
+		output.Error(fmt.Sprintf("filter error: %v", err))
+		os.Exit(1)
+	}
 
 	workspaceDir, err := os.Getwd()
 	if err != nil {
@@ -98,7 +105,7 @@ func runValidate(version string, args []string) {
 			continue
 		}
 
-		findings, err := engine.ComputeFindings(repoCfg, centralCfg, repoPath, config.ResolveManifestPath(rootCfg, repoCfg))
+		findings, err := engine.ComputeFindingsWithFilter(repoCfg, centralCfg, repoPath, config.ResolveManifestPath(rootCfg, repoCfg), fileFilter)
 		if err != nil {
 			report.Repos = append(report.Repos, output.RepoResult{
 				Name:             repoName,
